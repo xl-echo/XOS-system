@@ -1,0 +1,21 @@
+# XOS 构建产物（非源码，不入库）
+build/*.o
+build/*.pe
+build/*.bin
+build/*.img
+build/*.vdi
+build/*.log
+build/*.png
+build/boot.bin
+build/stage2.bin
+build/kernel.bin
+build/kernel.pe
+build/xos.img
+build/xos.vdi
+
+# 备份/临时
+*.bak*
+*.tmp
+*.swp
+.DS_Store
+Thumbs.db
