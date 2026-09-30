@@ -30,8 +30,8 @@
 
 .equ KERNEL_SEG,   0x1000        /* 0x1000:0x0000 = 0x10000 */
 .equ KERNEL_LBA,   33
-.equ KERNEL_SECS,  656           /* 336 KB：交互式终端 Shell 加入后内核扩容 */
-.equ BKUP_LBA,     689           /* 备用内核副本，签名损坏时回退 */
+.equ KERNEL_SECS,  660           /* 337920B：登录界面加入后内核扩容 */
+.equ BKUP_LBA,     693           /* 备用内核副本，签名损坏时回退 */
 .equ CHUNK_SECS,   32
 .equ MAX_RETRY,    3
 

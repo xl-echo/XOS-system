@@ -6,6 +6,7 @@
  * ========================================================================== */
 #include "keyboard.h"
 #include "console.h"
+#include "irq.h"
 
 /* ---------------- 端口 I/O ---------------- */
 static inline void outb(u16 port, u8 val)
@@ -250,6 +251,17 @@ int kbd_read_event(kbd_event_t *ev)
     if (ev == (kbd_event_t *)0) return -1;
     return ev_pop(ev);
 }
+
+/* ---------------- IRQ1 中断路径 ----------------
+ * 真实硬件/虚拟机键盘数据经 PS/2 控制器到达并触发 IRQ1。
+ * 此处直接复用轮询解析（kbd_poll 检查 OBF 后读一个字节并 key_handle），
+ * 中断上下文期间主流程处于 hlt/临界区之外，队列写入安全。
+ */
+static void kbd_irq_handler(void *arg)
+{
+    (void)arg;
+    kbd_poll();
+}
 u32 kbd_ev_count(void) { return g_qcount; }
 u32 kbd_mods(void) { return g_mods; }
 
@@ -357,6 +369,10 @@ void kbd_init(void)
     g_repeat_key = KEY_NONE; g_repeat_ticks = 0u;
     g_filter_enabled = 1u;
     g_led_num = g_led_caps = g_led_scroll = 0u;
+
+    /* 键盘走真实中断路径：IRQ1 使能，注入/真实敲击都能进事件队列 */
+    irq_request(1u, kbd_irq_handler, 0);
+    irq_enable_nr(1u);
 }
 
 /* ---------------- 导出 ---------------- */

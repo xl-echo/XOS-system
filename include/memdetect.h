@@ -40,7 +40,8 @@
 /* 持久化块落点：内核保留区（0x00000000-0x0003FFFF）的最后一页。
  * 选择依据：既在内核保留区内（PMM 不会把它当空闲页分配出去），
  * 又在内核映像 + .bss 之上（不覆盖代码与数据）。 */
-#define MDET_BOOTINFO_ADDR   0x0007F000u  /* 保留窗口顶（0x80000-0x1000），高于内核 .bss 增长区，写入不会踩坏内核静态数据 */
+#define MDET_BOOTINFO_ADDR   0x00008000u  /* 低区保留窗口内、内核镜像(0x10000 起)之下，
+                                             高于 IVT/BIOS 数据区，写入不会踩坏内核静态数据 */
 #define MDET_BOOTINFO_MAGIC  0x4D444254u   /* 'MDBT' */
 #define MDET_BOOTINFO_VER    0x00010001u
 
@@ -265,6 +266,7 @@ int  mdet_init(const e820_entry_t *entries, u32 count);
 int  mdet_restore(void);          /* 复原到 mdet_init 时的映射快照 */
 u32  mdet_region_count(void);
 const e820_entry_t *mdet_region(u32 index);
+u32  mdet_ready_state(void);      /* 调试探针：mdet_ready 当前值 */
 
 /* S04：ACPI 区域识别 */
 int  mdet_acpi_probe(void);

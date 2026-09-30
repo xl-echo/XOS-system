@@ -46,9 +46,9 @@ static u32 virt_pci_read(u32 bus, u32 dev, u32 func, u32 reg)
 /* ---- ACPI RSDP 轻量扫描（仅扫描内核已映射的低 1MB 内安全区） ---- */
 static u32 virt_acpi_scan(void)
 {
-    /* RSDP 常见位置：EBDA 与 0x9FC00 区域。XOS 保留区 0x80000..0x9FC00
-     * 已被映射且内容为固件表，安全可读；若签名不符即"未发现"。 */
-    const u8 *p = (const u8 *)0x9FC00u;
+    /* RSDP 常见位置：EBDA 与 0x9FD00 区域。XOS 保留区 0x80000..0x9FD00
+     * 已被映射且内容安全可读；若签名不符即"未发现"。 */
+    const u8 *p = (const u8 *)0x9FD00u;
     if (p[0] == 'R' && p[1] == 'S' && p[2] == 'D' && p[3] == ' ' &&
         p[4] == 'P' && p[5] == 'T' && p[6] == 'R' && p[7] == ' ')
         return 1u;

@@ -67,3 +67,18 @@ _start:
 .hang:
     hlt
     jmp     .hang
+
+/* ---------------------------------------------------------------------------
+ * void kstack_switch(u32 new_esp);
+ * 切换到高位大栈：把返回地址搬到新栈顶再 ret，调用方此后不依赖旧栈帧。
+ * 用于 PMM 就绪后消除低区启动栈（0x9FFFC，与 bss_end 仅隔 ~924B）的溢出风险。
+ * ------------------------------------------------------------------------ */
+.globl _kstack_switch
+_kstack_switch:
+    movl    4(%esp), %eax    /* new_esp */
+    movl    (%esp), %ecx     /* 返回地址（旧栈顶） */
+    subl    $4, %eax         /* 预留返回地址槽 */
+    movl    %eax, %esp       /* 切栈 */
+    movl    %ecx, (%esp)     /* 返回地址落到新栈 */
+    movl    %esp, %ebp
+    ret

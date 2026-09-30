@@ -125,6 +125,7 @@ u32  pmm_free_region_count(void);
 /* ---- 分配与释放 ---- */
 u32  pmm_alloc_page(void);
 u32  pmm_alloc_pages(u32 n);
+u32  pmm_alloc_high_pages(u32 n);
 u32  pmm_alloc_page_zeroed(void);
 int  pmm_free_page(u32 phys);
 int  pmm_free_pages(u32 phys, u32 n);

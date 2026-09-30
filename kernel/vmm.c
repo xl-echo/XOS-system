@@ -1084,12 +1084,21 @@ void vmm_mm_dump(vmm_mm_t *mm)
 
 void vmm_dump(void)
 {
-    vmm_stats_t st;
     u32 i;
-    vmm_stats(&st);
+    u32 mmc = vmm_mm_used;
+    u32 vc  = vmm_vma_used;
+    u32 rc  = vmm_rmap_n;
+    u32 hc  = vmm_huge_used;
+    u32 pc  = 0, pd = 0, pw = 0;
+    for (i = 0; i < VMM_MAX_PGCACHE; i++) {
+        if (!vmm_pgcache_pool[i].used) continue;
+        pc++;
+        if (vmm_pgcache_pool[i].dirty) pd++;
+        pw += vmm_pgcache_pool[i].writeback_count;
+    }
 
     con_puts("  Paging               : ");
-    con_puts(st.enabled ? "enabled" : "disabled");
+    con_puts(vmm_paging_on ? "enabled" : "disabled");
     con_puts("   PSE 4MB pages ");
     con_puts(vmm_pse_ok ? "available" : "unavailable");
     con_putc('\n');
@@ -1097,74 +1106,70 @@ void vmm_dump(void)
     con_puts("  Kernel/user split    : ");
     con_put_hex32(KERNEL_SPACE_BASE);
     con_puts("   shared PGD entries ");
-    con_put_dec(st.kernel_pgd_shared);
+    con_put_dec(vmm_kernel_pgd_shared());
     con_putc('\n');
 
     con_puts("  Address spaces       : ");
-    con_put_dec(st.mm_count);
+    con_put_dec(mmc);
     con_puts("   current mm#");
     con_put_dec(vmm_current_mm_id());
     con_putc('\n');
 
     con_puts("  VMAs / rmap entries  : ");
-    con_put_dec(st.vma_count);
+    con_put_dec(vc);
     con_puts(" / ");
-    con_put_dec(st.rmap_count);
+    con_put_dec(rc);
     con_putc('\n');
 
     con_puts("  Page table pages     : ");
-    con_put_dec(st.pt_pages_total);
+    con_put_dec(vmm_pt_peak);
     con_puts(" peak   huge pages ");
-    con_put_dec(st.huge_count);
+    con_put_dec(hc);
     con_puts(" (");
-    con_put_dec(st.huge_bytes >> 20);
+    con_put_dec(hc * 4u);
     con_puts(" MB)\n");
 
     con_puts("  Page cache           : ");
-    con_put_dec(st.pgcache_count);
+    con_put_dec(pc);
     con_puts(" pages   dirty ");
-    con_put_dec(st.pgcache_dirty);
+    con_put_dec(pd);
     con_puts("   writeback ");
-    con_put_dec(st.pgcache_writeback);
+    con_put_dec(pw);
     con_putc('\n');
 
     con_puts("  Swap slots           : ");
-    con_put_dec(st.swap_total - st.swap_free);
+    con_put_dec(vmm_swap_total_slots() - vmm_swap_free_slots());
     con_puts(" / ");
-    con_put_dec(st.swap_total);
+    con_put_dec(vmm_swap_total_slots());
     con_puts("   out ");
-    con_put_dec(st.swap_out_total);
+    con_put_dec(vmm_swap_out_count());
     con_puts("  in ");
-    con_put_dec(st.swap_in_total);
+    con_put_dec(vmm_swap_in_count());
     con_putc('\n');
 
     con_puts("  Faults               : ");
-    con_put_dec(st.fault_total);
+    con_put_dec(vmm_fault_count());
     con_puts("   resolved ");
-    con_put_dec(st.fault_resolved);
+    con_put_dec(vmm_fault_resolved_count());
     con_puts("   refused ");
-    con_put_dec(st.fault_refused);
+    con_put_dec(vmm_fault_refused_count());
     con_puts("   COW ");
-    con_put_dec(st.cow_total);
-    con_puts("   stack-grow ");
-    con_put_dec(st.grow_total);
+    con_put_dec(vmm_cow_count());
     con_putc('\n');
 
     con_puts("  TLB                  : flush ");
-    con_put_dec(st.tlb_flush_total);
+    con_put_dec(vmm_tlb_flush_total());
     con_puts("   shootdown ");
-    con_put_dec(st.shootdown_total);
-    con_puts("   pending ");
-    con_put_dec(st.shootdown_pending);
+    con_put_dec(vmm_tlb_shootdown_total());
     con_putc('\n');
 
     con_puts("  ASLR                 : ");
-    con_puts(st.aslr_on ? "on" : "off");
+    con_puts(vmm_aslr_get() ? "on" : "off");
     con_puts("   entropy ");
-    con_put_hex32(st.entropy);
+    con_put_hex32(vmm_aslr_entropy());
     con_putc('\n');
 
-    for (i = 0; i < vmm_mm_used && i < 3; i++) {
+    for (i = 0; i < mmc && i < 3; i++) {
         if (vmm_mm_pool[i].used) vmm_mm_dump(&vmm_mm_pool[i]);
     }
 }

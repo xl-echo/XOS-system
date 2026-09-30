@@ -74,7 +74,7 @@ u32 pmm_lock_enter_count(void) { return pmm_lock_calls; }
  * 保守保留到 0x80000（共 448KB），确保内核代码段、静态数据、位图
  * 与 .bss（随堆分配器等模块增长）不会被页分配器回收。 */
 #define KERNEL_RESERVE_BASE  0x00010000u
-#define KERNEL_RESERVE_END   0x0009FC00u   /* 与 kmain KERNEL_RESERVE_END_CHECK 对齐：覆盖 bss 至 EBDA 前，防止堆分配踩入 */
+#define KERNEL_RESERVE_END   0x0009FD00u   /* 与 kmain KERNEL_RESERVE_END_CHECK 对齐：含登录界面 bss，防止堆分配踩入 */
 
 /* ---- 扩展子系统常量（定义在此处，供 pmm_stats 等前置函数使用） ---- */
 #define ZONE_DMA        0
@@ -316,12 +316,45 @@ u32 pmm_find_contiguous(u32 n)
         if (test_bit(used_bitmap, p) || test_bit(resv_bitmap, p)) {
             run = 0;
             continue;
-        }
-        if (run == 0) start = p;
+        }        if (run == 0) start = p;
         run++;
         if (run == n) return start;
     }
     return PMM_MAX_PAGES;
+}
+
+/* --------------------------------------------------------------------------
+ * 高位分配：从受管内存最高地址向下找 n 连续空闲页并标记占用。
+ * 供内核大栈等"不希望与低位动态结构争抢"的场景使用。
+ * ------------------------------------------------------------------------ */
+u32 pmm_alloc_high_pages(u32 n)
+{
+    u32 p, i, base = PMM_MAX_PAGES, run = 0;
+    u32 eflags;
+
+    if (n == 0 || n > total_pages) return 0;
+    eflags = pmm_lock_enter();
+    for (p = total_pages; p > 0; p--) {
+        u32 pi = p - 1;
+        if (!test_bit(used_bitmap, pi) && !test_bit(resv_bitmap, pi)) {
+            run++;
+            if (run >= n) { base = pi; break; }
+        } else {
+            run = 0;
+        }
+    }
+    if (run < n || base >= total_pages || base + n > total_pages) {
+        pmm_lock_exit(eflags);
+        return 0;
+    }
+    /* 保留语义：内核大栈页永不复用，避免内存耗尽自检（全量分配/释放）
+     * 把当前正在使用的栈页释放后再分配给其它用途，导致执行流损坏 */
+    for (i = 0; i < n; i++) {
+        mark_reserved_page(base + i);
+        zone_add(base + i, 0, -1);   /* 保留页同步移出空闲区计数，维持 zone 自洽 */
+    }
+    pmm_lock_exit(eflags);
+    return PAGE_TO_PHYS(base);
 }
 
 u32 pmm_count_free_in_range(u32 start, u32 end)

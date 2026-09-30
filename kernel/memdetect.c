@@ -330,9 +330,10 @@ u32 mdet_region_count(void)
     u32 r, eflags;
     eflags = mdet_lock_enter();
     r = mdet_n;
-    mdet_lock_exit(eflags);
-    return r;
+    mdet_lock_exit(eflags);    return r;
 }
+
+u32 mdet_ready_state(void) { return mdet_ready ? 1u : 0u; }
 
 const e820_entry_t *mdet_region(u32 index)
 {

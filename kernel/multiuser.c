@@ -411,5 +411,13 @@ int mu_selftest(void)
     if (mu_user_flags(uid1, &flags) != 0) return 44;
     if (!(flags & 2u)) return 45;
 
+    /* 自检不污染运行时：清空全部用户/组/会话，恢复全新状态 */
+    for (i = 0u; i < MU_MAX_USERS; i++) g_users[i].used = 0u;
+    g_uid_seq = 0u;
+    for (i = 0u; i < MU_MAX_GROUPS; i++) g_groups[i].used = 0u;
+    g_gid_seq = 0u;
+    for (i = 0u; i < MU_MAX_SESSIONS; i++) g_sessions[i].used = 0u;
+    g_sess_seq = 0u;
+
     return 0;
 }

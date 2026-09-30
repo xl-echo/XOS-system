@@ -218,6 +218,19 @@ void shell_interactive(void)
                     if (g_len < SH_MAX_LINE - 1) { g_line[g_len++] = c; con_putc(c); }
                 }
                 con_flush();
+            } else if (ev.type == EV_KEY_DOWN) {
+                if (ev.key == KEY_ENTER) {
+                    con_puts("\n");
+                    g_line[g_len] = 0;
+                    if (g_len > 0) sh_hist_add(g_line);
+                    run_line(g_line);
+                    con_puts("\n");
+                    con_flush();
+                    break;
+                } else if (ev.key == KEY_BACKSP) {
+                    if (g_len > 0) { g_len--; con_puts("\b \b"); }
+                    con_flush();
+                }
             }
         }
     }

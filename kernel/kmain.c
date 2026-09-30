@@ -49,6 +49,7 @@
 #include "inst.h"     /* 第 32 册：安装程序-包管理 */
 #include "virt.h"     /* 第 33 册：虚拟化支持 */
 #include "shell_interactive.h" /* 交互式终端 Shell（自检通过后接管控制台） */
+#include "login.h"             /* 登录界面（第 34 册：登录界面） */
 
 #define XOS_VERSION "0.2.0"
 
@@ -57,7 +58,7 @@ extern u8 __bss_start[];
 extern u8 __bss_end[];
 
 /* 与 pmm.c 保持一致的内核保留区上界 */
-#define KERNEL_RESERVE_END_CHECK  0x0009FC00u   /* 上限上移至 EBDA 前：bss_end 0x9FA60 之上仍有 416B 余量 */
+#define KERNEL_RESERVE_END_CHECK  0x0009FD00u   /* 上限含登录界面 bss；0x9FD00 之下留 160B 余量，未触 0xA0000 VGA 区 */
 
 static u32 tests_run    = 0;
 static u32 tests_failed = 0;
@@ -224,37 +225,34 @@ static void print_mem_stats(const mem_stats_t *st)
  * ------------------------------------------------------------------------ */
 static void print_pmm_stats(void)
 {
-    pmm_stats_t st;
-    pmm_stats(&st);
-
     con_puts("  Page size            : 4096 bytes\n");
 
     con_puts("  Managed memory       : ");
-    con_put_dec(st.managed_bytes >> 10);
+    con_put_dec(pmm_managed_bytes() >> 10);
     con_puts(" KB  (");
-    con_put_dec(st.total_pages);
+    con_put_dec(pmm_total_pages());
     con_puts(" pages)\n");
 
     con_puts("  Reserved pages       : ");
-    con_put_dec(st.reserved_pages);
+    con_put_dec(pmm_reserved_pages());
     con_putc('\n');
 
     con_puts("  Used pages           : ");
-    con_put_dec(st.used_pages);
+    con_put_dec(pmm_used_pages());
     con_putc('\n');
 
     con_puts("  Free pages           : ");
-    con_put_dec(st.free_pages);
+    con_put_dec(pmm_free_page_count());
     con_puts("  (");
-    con_put_dec(st.free_pages * 4u / 1024u);
+    con_put_dec(pmm_free_page_count() * 4u / 1024u);
     con_puts(" MB)\n");
 
     con_puts("  Largest free run     : ");
-    con_put_dec(st.largest_free_run);
+    con_put_dec(pmm_largest_free_run());
     con_puts(" pages\n");
 
     con_puts("  Free regions         : ");
-    con_put_dec(st.free_regions);
+    con_put_dec(pmm_free_region_count());
     con_puts("  (fragmentation index)\n");
 
     con_putc('\n');
@@ -265,9 +263,7 @@ static void print_pmm_stats(void)
  * ------------------------------------------------------------------------ */
 static void print_mem_ext_stats(void)
 {
-    pmm_stats_t st;
     u32 z;
-    pmm_stats(&st);
 
     con_puts("  Zones                : ");
     for (z = 0; z < pmm_zone_count(); z++) {
@@ -281,57 +277,53 @@ static void print_mem_ext_stats(void)
     con_putc('\n');
 
     con_puts("  NUMA nodes           : ");
-    con_put_dec(st.numa_nodes);
+    con_put_dec(pmm_numa_node_count());
     con_puts("  (local distance ");
     con_put_dec(pmm_numa_distance(0, 0));
     con_puts(")\n");
 
     con_puts("  Watermarks min/low/high: ");
-    con_put_dec(st.wm_min);
+    con_put_dec(pmm_watermark(0));
     con_puts(" / ");
-    con_put_dec(st.wm_low);
+    con_put_dec(pmm_watermark(1));
     con_puts(" / ");
-    con_put_dec(st.wm_high);
+    con_put_dec(pmm_watermark(2));
     con_puts("   pressure ");
-    con_puts(pmm_pressure_name(st.pressure));
+    con_puts(pmm_pressure_name(pmm_pressure_level()));
     con_putc('\n');
 
-    con_puts("  Buddy free blocks    : ");
-    con_put_dec(st.buddy_blocks);
-    con_puts("  (order 0..10)\n");
-
     con_puts("  Huge pages (2MB)     : ");
-    con_put_dec(st.huge_used);
+    con_put_dec(pmm_huge_used());
     con_puts(" / ");
-    con_put_dec(st.huge_total);
+    con_put_dec(pmm_huge_count());
     con_putc('\n');
 
     con_puts("  Anti-frag reserve    : ");
-    con_put_dec(st.antifrag_pages);
+    con_put_dec(pmm_antifrag_pages());
     con_puts(" pages   frag index ");
-    con_put_dec(st.frag_index);
+    con_put_dec(pmm_frag_index());
     con_puts("/1000\n");
 
     con_puts("  Shrinkers / reclaim  : ");
-    con_put_dec(st.shrinker_count);
+    con_put_dec(pmm_shrinker_count());
     con_puts(" / ");
-    con_put_dec(st.reclaim_calls);
+    con_put_dec(pmm_reclaim_calls());
     con_puts(" calls, ");
-    con_put_dec(st.reclaim_freed);
+    con_put_dec(pmm_reclaim_freed());
     con_puts(" pages\n");
 
     con_puts("  OOM events           : ");
-    con_put_dec(st.oom_count);
+    con_put_dec(pmm_oom_count());
     con_puts("   scrub ");
-    con_put_dec(st.scrub_count);
+    con_put_dec(pmm_scrub_count());
     con_puts(" pages   offline bad ");
-    con_put_dec(st.badpage_count);
+    con_put_dec(pmm_badpage_count());
     con_putc('\n');
 
     con_puts("  Hotplug regions      : ");
-    con_put_dec(st.hotplug_count);
+    con_put_dec(pmm_hotplug_count());
     con_puts("   IO mappings ");
-    con_put_dec(st.ioremap_count);
+    con_put_dec(pmm_ioremap_count());
     con_putc('\n');
     con_putc('\n');
 }
@@ -357,11 +349,8 @@ static void print_vmm_diag(void)
 
 static void print_vmm_stats(void)
 {
-    vmm_stats_t st;
-    vmm_stats(&st);
-
     con_puts("  Paging mode          : ");
-    con_puts(st.enabled ? "enabled (CR0.PG=1, CR0.WP=1)" : "disabled");
+    con_puts(vmm_enabled() ? "enabled (CR0.PG=1, CR0.WP=1)" : "disabled");
     con_puts("   PSE ");
     con_puts(vmm_pse_available() ? "yes" : "no");
     con_putc('\n');
@@ -369,70 +358,64 @@ static void print_vmm_stats(void)
     con_puts("  Kernel identity map  : 0x00000000-");
     con_put_hex32(KERNEL_IDENTITY_TOP);
     con_puts("  (");
-    con_put_dec(st.kernel_pgd_shared);
+    con_put_dec(vmm_kernel_pgd_shared());
     con_puts(" shared PGD entries)\n");
 
     con_puts("  Address spaces       : ");
-    con_put_dec(st.mm_count);
-    con_puts("   VMA ");
-    con_put_dec(st.vma_count);
+    con_put_dec(vmm_mm_count());
     con_puts("   page tables ");
-    con_put_dec(st.pt_pages_total);
+    con_put_dec(vmm_pt_pages_used());
     con_puts(" pages\n");
 
     con_puts("  Large pages (4MB PSE): ");
-    con_put_dec(st.huge_count);
+    con_put_dec(vmm_huge_count());
     con_puts("   covering ");
-    con_put_dec(st.huge_bytes >> 20);
+    con_put_dec(vmm_huge_count() * 4u);
     con_puts(" MB\n");
 
     con_puts("  TLB flush / shootdown: ");
-    con_put_dec(st.tlb_flush_total);
+    con_put_dec(vmm_tlb_flush_total());
     con_puts(" / ");
-    con_put_dec(st.shootdown_total);
-    con_puts("  (pending ");
-    con_put_dec(st.shootdown_pending);
-    con_puts(")\n");
+    con_put_dec(vmm_tlb_shootdown_total());
+    con_putc('\n');
 
     con_puts("  ASLR                 : ");
-    con_puts(st.aslr_on ? "on" : "off");
+    con_puts(vmm_aslr_get() ? "on" : "off");
     con_puts("   entropy ");
-    con_put_hex32(st.entropy);
+    con_put_hex32(vmm_aslr_entropy());
     con_putc('\n');
 
     con_puts("  Swap slots free/total: ");
-    con_put_dec(st.swap_free);
+    con_put_dec(vmm_swap_free_slots());
     con_puts(" / ");
-    con_put_dec(st.swap_total);
+    con_put_dec(vmm_swap_total_slots());
     con_puts("   out ");
-    con_put_dec(st.swap_out_total);
+    con_put_dec(vmm_swap_out_count());
     con_puts(" in ");
-    con_put_dec(st.swap_in_total);
+    con_put_dec(vmm_swap_in_count());
     con_putc('\n');
 
     con_puts("  rmap / page cache    : ");
-    con_put_dec(st.rmap_count);
+    con_put_dec(vmm_rmap_used());
     con_puts(" entries / ");
-    con_put_dec(st.pgcache_count);
+    con_put_dec(vmm_pgcache_count());
     con_puts(" pages (dirty ");
-    con_put_dec(st.pgcache_dirty);
+    con_put_dec(vmm_pgcache_dirty_count());
     con_puts(", writeback ");
-    con_put_dec(st.pgcache_writeback);
+    con_put_dec(vmm_pgcache_writeback_count());
     con_puts(")\n");
 
     con_puts("  Page faults total    : ");
-    con_put_dec(st.fault_total);
+    con_put_dec(vmm_fault_count());
     con_puts("   resolved ");
-    con_put_dec(st.fault_resolved);
+    con_put_dec(vmm_fault_resolved_count());
     con_puts("   refused ");
-    con_put_dec(st.fault_refused);
+    con_put_dec(vmm_fault_refused_count());
     con_putc('\n');
 
-    con_puts("  COW copies / stack   : ");
-    con_put_dec(st.cow_total);
-    con_puts(" / ");
-    con_put_dec(st.grow_total);
-    con_puts(" grows\n");
+    con_puts("  COW copies           : ");
+    con_put_dec(vmm_cow_count());
+    con_puts("\n");
 
     con_puts("  Shrinker reclaim     : ");
     con_put_dec(vmm_shrinker_calls());
@@ -442,21 +425,33 @@ static void print_vmm_stats(void)
     con_putc('\n');
 }
 
+/* 高位内核栈切换（bss 逼近 0x9FC60 后，低区启动栈 0x9FFFC 仅剩 ~924B，
+ * 自检深层调用链可能越界；PMM 就绪后切到 64KB 物理页栈） */
+extern void kstack_switch(u32 new_esp);
+
+static inline u32 rd_esp(void)
+{
+    u32 e;
+    __asm__ volatile ("mov %%esp,%0" : "=r"(e));
+    return e;
+}
+static void diag_esp(const char *tag)
+{
+    con_puts("  [esp] ");
+    con_puts(tag);
+    con_puts(" ");
+    con_put_hex32(rd_esp());
+    con_putc('\n');
+}
+
 void kmain(void)
 {
-    mem_stats_t st;
-    u32 rc;
-    u32 kend;
+    static mem_stats_t st;
+    static u32 rc;
+    static u32 kend;
 
     con_init();
     print_banner();
-
-    /* 诊断：bss 尾 0x9F620 之上哨兵，检测阶段 1-11 的越界写 */
-    {
-        volatile u32 *sg = (volatile u32 *)0x9F620;
-        u32 _i;
-        for (_i = 0; _i < 64u; _i++) sg[_i] = 0x5A5A5A5Au;
-    }
 
     /* =====================================================================
      * 阶段 1：IDT 与异常处理
@@ -526,7 +521,17 @@ void kmain(void)
      * ================================================================== */
     section("[5/7] Initializing page frame allocator...\n");
     pmm_init();
+    /* 切高位大栈：此后不再依赖低区 0x9FFFC 启动栈（其与 bss_end 仅隔 ~924B） */
+    {
+        u32 sbase = pmm_alloc_high_pages(16);   /* 64KB 连续物理页，取受管内存最高处 */
+        if (sbase != 0u) {
+            u32 stop = (sbase + 16u * 4096u - 4u) & ~0xFu;
+            kstack_switch(stop);
+        }
+    }
+    diag_esp("after kstack_switch");
     print_pmm_stats();
+    diag_esp("after print_pmm_stats");
     pmm_dump();
     con_putc('\n');
     stage_pause();
@@ -546,8 +551,11 @@ void kmain(void)
            "Page fault handling self-test", vmm_fault_selftest());
     report("rmap / page cache writeback / reclaim / address space teardown",
            "Virtual memory extended self-test", vmm_ext_selftest());
+    diag_esp("after vmm_ext_selftest");
     print_vmm_stats();
+    diag_esp("after print_vmm_stats");
     vmm_dump();
+    diag_esp("after vmm_dump");
     stage_pause();
 
     /* =====================================================================
@@ -568,7 +576,7 @@ void kmain(void)
      * ACPI 探测必须早于热插拔探测 —— 后者依赖 SRAT 表。
      * ================================================================== */
     section("[8/9] Probing firmware memory description...\n");
-    mdet_init(e820_table(), e820_count());
+    rc = (u32)mdet_init(e820_table(), e820_count());
     mdet_acpi_probe();
     mdet_smbios_probe();
     mdet_physaddr_probe();
@@ -961,6 +969,9 @@ summary:
     con_flush();
 
     if (tests_failed == 0) {
+        con_puts("  System self-check passed. Starting login...\n");
+        con_flush();
+        login_run();
         con_puts("  Entering interactive shell. Type 'help' for commands.\n");
         con_flush();
         shell_interactive();
