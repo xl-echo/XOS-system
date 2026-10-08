@@ -22,7 +22,23 @@ extern void *memset(void *dst, int c, unsigned int n);
 /* ---------------- 32bpp 帧缓冲访问 ---------------- */
 static volatile u32 *dg_fb = (volatile u32 *)DG_LFB;
 static u32 dg_sel = 0u;
-static void dg_itoa(int v, char *out);              /* 当前选中图标索引 */
+static void dg_itoa(int v, char *out);
+
+/* 音乐播放器状态 */
+static u32 dg_mu_play = 0u;      /* 播放中 */
+static u32 dg_mu_track = 0u;     /* 当前曲目 0-2 */
+static u32 dg_mu_start = 0u;     /* 播放起始 tick */
+/* 小游戏状态（5x5 收集） */
+static i32  dg_gm_px = 2, dg_gm_py = 2;
+static i32  dg_gm_fx = 4, dg_gm_fy = 3;
+static u32  dg_gm_score = 0u;
+static u32  dg_gm_seed = 1u;
+
+static u32 dg_rand(void)
+{
+    dg_gm_seed = dg_gm_seed * 1103515245u + 12345u;
+    return (dg_gm_seed >> 16) & 0x7FFFu;
+}              /* 当前选中图标索引 */
 
 static inline void dgpix(u32 x, u32 y, u32 c)
 {
@@ -381,17 +397,48 @@ static void dg_win_content(const dg_win_t *w)
             dg_text(bx, by + 132u, "M 移动  N 最小化  W 切换  Esc 关闭", gray, body);
             break;
         }
-    case 6u: /* 音乐 */
-        dg_text(bx, by, "音乐播放器", fg, body);
-        dg_fill(bx + 4u, by + 28u, 120u, 4u, dg_rgb(0x50,0xC8,0x70));
-        dg_text(bx + 4u, by + 52u, "▶ XOS 主题曲", blue, body);
-        dg_text(bx, by + 110u, "M 移动  N 最小化  W 切换  Esc 关闭", gray, body);
-        break;
-    default: /* 游戏 */
-        dg_text(bx, by, "游戏中心", fg, body);
-        dg_text(bx, by + 22u, "  [1] 贪吃蛇", fg, body);
-        dg_text(bx, by + 44u, "  [2] 2048", fg, body);
-        dg_text(bx, by + 110u, "M 移动  N 最小化  W 切换  Esc 关闭", gray, body);
+    case 6u: /* 音乐播放器：真实时钟进度 */
+        {
+            u32 sec = 0u;
+            const char *tracks[3] = { "XOS 主题曲", "启动协奏", "桌面圆舞曲" };
+            if (dg_mu_play) sec = (pit_tick_count() - dg_mu_start) / 100u;
+            dg_text(bx, by, "音乐播放器", fg, body);
+            dg_text(bx + 4u, by + 22u, dg_mu_play ? "▶ 播放中" : "⏸ 已暂停", blue, body);
+            dg_fill(bx + 4u, by + 44u, 180u, 6u, dg_rgb(0x30,0x40,0x50));
+            dg_fill(bx + 4u, by + 44u, (sec % 60u) * 3u, 6u, dg_rgb(0x50,0xC8,0x70));
+            dg_text(bx + 4u, by + 58u, tracks[dg_mu_track % 3u], dg_rgb(0xE0,0xE0,0xE0), body);
+            {
+                char nb[16];
+                nb[0] = (char)('0' + (sec / 60u));
+                nb[1] = ':';
+                nb[2] = (char)('0' + (sec % 60u) / 10u);
+                nb[3] = (char)('0' + (sec % 60u) % 10u);
+                nb[4] = 0;
+                dg_text(bx + 132u, by + 58u, nb, gray, body);
+            }
+            dg_text(bx, by + 110u, "P 播放/暂停  N 下一曲  M 移动  Esc 关闭", gray, body);
+            break;
+        }
+    default: /* 游戏：5x5 收集小游戏 */
+        {
+            i32 i, j;
+            char nb[16];
+            dg_text(bx, by, "游戏中心 · 收集", fg, body);
+            /* 5x5 网格 */
+            for (j = 0; j < 5; j++) {
+                for (i = 0; i < 5; i++) {
+                    u32 cell_c = dg_rgb(0x28,0x34,0x42);
+                    if (i == dg_gm_px && j == dg_gm_py) cell_c = dg_rgb(0x30,0xC0,0x50);
+                    else if (i == dg_gm_fx && j == dg_gm_fy) cell_c = dg_rgb(0xE0,0xA0,0x30);
+                    dg_fill(bx + 8u + i * 22u, by + 26u + j * 22u, 18u, 18u, cell_c);
+                }
+            }
+            nb[0] = 'S'; nb[1] = 'c'; nb[2] = 'o'; nb[3] = 'r'; nb[4] = 'e'; nb[5] = ':';
+            dg_itoa((int)dg_gm_score, nb + 6);
+            dg_text(bx + 8u, by + 132u, nb, dg_rgb(0x30,0xC0,0x50), body);
+            dg_text(bx, by + 152u, "方向键移动 Enter收集 S重置 Esc关闭", gray, body);
+            break;
+        }
         break;
     }
 }
@@ -933,6 +980,50 @@ void desk_gui_run(void)
                     dg_term_input(w, key);
                 } else {
                     dg_browser_input(w, key);
+                }
+                dg_render();
+                continue;
+            }
+            /* 音乐播放器 */
+            if (w->icon == 6u) {
+                if (key == KEY_P) {
+                    if (!dg_mu_play) dg_mu_start = pit_tick_count();
+                    dg_mu_play = dg_mu_play ? 0u : 1u;
+                } else if (key == KEY_N) {
+                    dg_mu_track++;
+                } else if (key == KEY_ESC) {
+                    dg_win_close();
+                } else if (key == KEY_M) {
+                    dg_move_mode = 1u;
+                }
+                dg_render();
+                continue;
+            }
+            /* 游戏窗口 */
+            if (w->icon == 7u) {
+                if (key == KEY_UP) {
+                    if (dg_gm_py > 0) dg_gm_py--;
+                } else if (key == KEY_DOWN) {
+                    if (dg_gm_py < 4) dg_gm_py++;
+                } else if (key == KEY_LEFT) {
+                    if (dg_gm_px > 0) dg_gm_px--;
+                } else if (key == KEY_RIGHT) {
+                    if (dg_gm_px < 4) dg_gm_px++;
+                } else if (key == KEY_ENTER) {
+                    if (dg_gm_px == dg_gm_fx && dg_gm_py == dg_gm_fy) {
+                        dg_gm_score++;
+                        dg_gm_fx = (i32)(dg_rand() % 5u);
+                        dg_gm_fy = (i32)(dg_rand() % 5u);
+                    }
+                } else if (key == KEY_S) {
+                    dg_gm_score = 0u;
+                    dg_gm_px = 2; dg_gm_py = 2;
+                    dg_gm_fx = (i32)(dg_rand() % 5u);
+                    dg_gm_fy = (i32)(dg_rand() % 5u);
+                } else if (key == KEY_ESC) {
+                    dg_win_close();
+                } else if (key == KEY_M) {
+                    dg_move_mode = 1u;
                 }
                 dg_render();
                 continue;
