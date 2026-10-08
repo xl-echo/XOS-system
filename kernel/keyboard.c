@@ -232,7 +232,7 @@ int kbd_poll(void)
     } else {
         key = KEY_NONE;
     }
-    if (key != KEY_NONE && key != KEY_KP0 && key != KEY_5 && key != KEY_PLUS) {
+    if (key != KEY_NONE && key != KEY_KP0 && key != KEY_5) {
         key_handle(0u, key, down);
     }
     return 1;

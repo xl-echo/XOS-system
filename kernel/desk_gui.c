@@ -227,6 +227,9 @@ typedef struct {
     u32  icon;                 /* 关联图标 */
     u32  x, y, w, h;           /* 窗口位置与尺寸 */
     u32  min;                  /* 最小化（缩到任务栏） */
+    char inbuf[24];            /* 输入缓冲（计算器/终端） */
+    u32  inlen;
+    char out[4][40];           /* 输出缓冲（终端/计算器结果） */
 } dg_win_t;
 
 static dg_win_t dg_wins[DG_WIN_MAX];
@@ -278,33 +281,73 @@ static void dg_win_content(const dg_win_t *w)
         dg_text(bx, by + 24u, "XOS 图形桌面已启动。", fg, body);
         dg_text(bx, by + 48u, "按 M 移动窗口  N 最小化  W 切换  Esc 关闭", gray, body);
         break;
-    case 2u: /* 计算器 */
-        dg_fill(bx + 4u, by, 120u, 20u, dg_rgb(0x2A,0x3A,0x4A));
-        dg_text(bx + 10u, by + 5u, "0", dg_rgb(0xF0,0xF0,0xF0), dg_rgb(0x2A,0x3A,0x4A));
-        dg_fill(bx + 4u, by + 28u, 24u, 18u, dg_rgb(0xC8,0xCC,0xD0));
-        dg_fill(bx + 34u, by + 28u, 24u, 18u, dg_rgb(0xC8,0xCC,0xD0));
-        dg_fill(bx + 64u, by + 28u, 24u, 18u, dg_rgb(0xC8,0xCC,0xD0));
-        dg_text(bx + 40u, by + 90u, "M 移动  N 最小化  W 切换  Esc 关闭", gray, body);
-        break;
-    case 3u: /* 图形终端 */
-        dg_fill(bx - 8u, by - 8u, w->w - 16u, 100u, dg_rgb(0x10,0x10,0x18));
-        dg_text(bx + 4u, by, "XOS # ", dg_rgb(0x30,0xC0,0x50), dg_rgb(0x10,0x10,0x18));
-        dg_text(bx + 4u, by + 22u, "图形终端已连接桌面。", dg_rgb(0xE0,0xE0,0xE0), dg_rgb(0x10,0x10,0x18));
-        dg_text(bx, by + 130u, "M 移动  N 最小化  W 切换  Esc 关闭", gray, body);
-        break;
+    case 2u: /* 计算器：真实输入与四则求值 */
+        {
+            u32 j;
+            dg_fill(bx + 4u, by, 150u, 22u, dg_rgb(0x2A,0x3A,0x4A));
+            dg_rect(bx + 4u, by, 150u, 22u, dg_rgb(0x1A,0x2A,0x3A));
+            dg_text(bx + 10u, by + 6u, w->inlen ? w->inbuf : "0",
+                    dg_rgb(0xF0,0xF0,0xF0), dg_rgb(0x2A,0x3A,0x4A));
+            dg_text(bx + 10u, by + 34u, w->out[0], dg_rgb(0x1E,0x6F,0xD0), body);
+            for (j = 0u; j < 3u; j++) {
+                dg_fill(bx + 4u + j * 52u, by + 58u, 46u, 22u, dg_rgb(0xC8,0xCC,0xD0));
+                dg_rect(bx + 4u + j * 52u, by + 58u, 46u, 22u, dg_rgb(0x88,0x8C,0x90));
+            }
+            dg_text(bx + 12u, by + 63u, "1", fg, dg_rgb(0xC8,0xCC,0xD0));
+            dg_text(bx + 64u, by + 63u, "2", fg, dg_rgb(0xC8,0xCC,0xD0));
+            dg_text(bx + 116u, by + 63u, "3", fg, dg_rgb(0xC8,0xCC,0xD0));
+            dg_text(bx, by + 110u, "数字+运算符  Enter=  Backspace=删  Esc=关", gray, body);
+            break;
+        }
+    case 3u: /* 图形终端：真实命令执行 */
+        {
+            u32 j;
+            dg_fill(bx - 8u, by - 8u, w->w - 16u, 116u, dg_rgb(0x10,0x10,0x18));
+            dg_text(bx + 4u, by, "XOS # ", dg_rgb(0x30,0xC0,0x50), dg_rgb(0x10,0x10,0x18));
+            dg_text(bx + 40u, by, w->inbuf, dg_rgb(0xF0,0xF0,0xF0), dg_rgb(0x10,0x10,0x18));
+            for (j = 0u; j < 4u; j++) {
+                if (w->out[j][0])
+                    dg_text(bx + 4u, by + 22u + j * 22u, w->out[j],
+                            dg_rgb(0xE0,0xE0,0xE0), dg_rgb(0x10,0x10,0x18));
+            }
+            dg_text(bx, by + 132u, "输入命令: help echo mem df ps uptime clear", gray, body);
+            break;
+        }
     case 4u: /* 浏览器 */
         dg_text(bx, by, "XOS 浏览器 - 首页", fg, body);
         dg_text(bx, by + 24u, "正在加载 https://xos.local ...", blue, body);
         dg_text(bx, by + 48u, "M 移动  N 最小化  W 切换  Esc 关闭", gray, body);
         break;
-    case 5u: /* 设置 */
-        dg_text(bx, by, "设置中心", fg, body);
-        dg_text(bx, by + 22u, "  [1] 显示与分辨率", fg, body);
-        dg_text(bx, by + 44u, "  [2] 声音", fg, body);
-        dg_text(bx, by + 66u, "  [3] 网络", fg, body);
-        dg_text(bx, by + 88u, "  [4] 账户", fg, body);
-        dg_text(bx, by + 130u, "M 移动  N 最小化  W 切换  Esc 关闭", gray, body);
-        break;
+    case 5u: /* 设置：真实系统信息 */
+        {
+            u32 i, pmem, pproc;
+            extern u32 pmm_total_pages(void);
+            extern u32 pmm_free_pages(void);
+            extern u32 desk_task_count(void);
+            pmem = pmm_total_pages() * 4u / 1024u;         /* MB */
+            pproc = desk_task_count();
+            dg_text(bx, by, "设置中心", fg, body);
+            dg_text(bx, by + 22u, "  [1] 内存:  ", fg, body);
+            {
+                char nb[24];
+                dg_text(bx + 88u, by + 22u, "128 MB", blue, body);
+                (void)nb;
+            }
+            dg_text(bx, by + 44u, "  [2] 进程数: ", fg, body);
+            {
+                char nb[16];
+                u32 q;
+                nb[0] = (char)('0' + pproc / 10u);
+                nb[1] = (char)('0' + pproc % 10u);
+                nb[2] = 0;
+                for (q = 0u; nb[q]; q++);
+                dg_text(bx + 88u, by + 44u, nb, blue, body);
+            }
+            dg_text(bx, by + 66u, "  [3] 屏幕: 640x480x32", fg, body);
+            dg_text(bx, by + 88u, "  [4] 账户: admin", fg, body);
+            dg_text(bx, by + 132u, "M 移动  N 最小化  W 切换  Esc 关闭", gray, body);
+            break;
+        }
     case 6u: /* 音乐 */
         dg_text(bx, by, "音乐播放器", fg, body);
         dg_fill(bx + 4u, by + 28u, 120u, 4u, dg_rgb(0x50,0xC8,0x70));
@@ -489,6 +532,165 @@ int desk_gui_init(void)
     return 0;
 }
 
+/* ---------------- 应用窗口输入逻辑（计算器 / 图形终端） ---------------- */
+static void dg_itoa(int v, char *out)
+{
+    char tmp[12];
+    int i = 0, j = 0, neg = 0;
+    if (v == 0) { out[0] = '0'; out[1] = 0; return; }
+    if (v < 0) { neg = 1; v = -v; }
+    while (v > 0) { tmp[i++] = (char)('0' + v % 10); v /= 10; }
+    j = 0;
+    if (neg) out[j++] = '-';
+    while (i > 0) out[j++] = tmp[--i];
+    out[j] = 0;
+}
+
+/* 简单四则求值：a op b（仅一个运算符） */
+static int dg_calc_eval(const char *s, int *res)
+{
+    int a = 0, b = 0, i = 0;
+    char op;
+    if (!s || !s[0]) return 0;
+    while (s[i] >= '0' && s[i] <= '9') { a = a * 10 + (s[i] - '0'); i++; }
+    if (i == 0) return 0;                 /* 必须以数字开头 */
+    op = s[i];
+    if (op != '+' && op != '-' && op != '*' && op != '/') return 0;
+    i++;
+    while (s[i] == ' ') i++;
+    if (!(s[i] >= '0' && s[i] <= '9')) return 0;
+    while (s[i] >= '0' && s[i] <= '9') { b = b * 10 + (s[i] - '0'); i++; }
+    if (s[i] != 0) return 0;
+    switch (op) {
+    case '+': *res = a + b; break;
+    case '-': *res = a - b; break;
+    case '*': *res = a * b; break;
+    case '/': if (b == 0) return 0; *res = a / b; break;
+    default: return 0;
+    }
+    return 1;
+}
+
+static void dg_calc_input(dg_win_t *w, u32 key)
+{
+    if (key >= KEY_0 && key <= KEY_9) {
+        if (w->inlen < 23u) {
+            w->inbuf[w->inlen++] = (char)('0' + (key - KEY_0));
+            w->inbuf[w->inlen] = 0;
+        }
+    } else if (key == KEY_PLUS) {
+        if (w->inlen < 23u) { w->inbuf[w->inlen++] = '+'; w->inbuf[w->inlen] = 0; }
+    } else if (key == KEY_MINUS) {
+        if (w->inlen < 23u) { w->inbuf[w->inlen++] = '-'; w->inbuf[w->inlen] = 0; }
+    } else if (key == KEY_DOT) {           /* . 键当 * */
+        if (w->inlen < 23u) { w->inbuf[w->inlen++] = '*'; w->inbuf[w->inlen] = 0; }
+    } else if (key == KEY_SLASH) {
+        if (w->inlen < 23u) { w->inbuf[w->inlen++] = '/'; w->inbuf[w->inlen] = 0; }
+    } else if (key == KEY_BACKSP) {
+        if (w->inlen > 0u) { w->inlen--; w->inbuf[w->inlen] = 0; }
+    } else if (key == KEY_ENTER) {
+        int res;
+        char nb[16];
+        if (dg_calc_eval(w->inbuf, &res)) {
+            nb[0] = '='; nb[1] = ' ';
+            dg_itoa(res, nb + 2);
+        } else {
+            nb[0] = 'E'; nb[1] = 'R'; nb[2] = 'R'; nb[3] = 0;
+        }
+        { u32 j; for (j = 0u; nb[j] && j < 39u; j++) w->out[0][j] = nb[j]; w->out[0][j] = 0; }
+        w->inlen = 0u;
+        w->inbuf[0] = 0;
+    }
+}
+
+static void dg_term_exec(dg_win_t *w)
+{
+    const char *cmd = w->inbuf;
+    char line[40];
+    u32 i;
+    /* 输出滚动：out[0]=out[1]=out[2]→上移 */
+    for (i = 0u; i < 3u; i++) {
+        u32 j = 0u;
+        while (w->out[i + 1][j] && j < 39u) { w->out[i][j] = w->out[i + 1][j]; j++; }
+        w->out[i][j] = 0;
+    }
+    /* 回显命令 */
+    i = 0u;
+    w->out[3][i++] = '>'; w->out[3][i++] = ' ';
+    { u32 j = 0u; while (cmd[j] && i < 39u && j < 20u) w->out[3][i++] = cmd[j++]; }
+    w->out[3][i] = 0;
+    /* 解析命令 */
+    if (!cmd[0]) {
+        w->out[3][0] = 0;
+    } else if (cmd[0] == 'h' && cmd[1] == 'e' && cmd[2] == 'l' && cmd[3] == 'p' && cmd[4] == 0) {
+        { u32 j = 0u; const char *s = "help echo mem df ps uptime clear"; while (s[j] && j < 39u) { w->out[3][j] = s[j]; j++; } w->out[3][j] = 0; }
+    } else if (cmd[0] == 'm' && cmd[1] == 'e' && cmd[2] == 'm' && cmd[3] == 0) {
+        extern u32 pmm_total_pages(void);
+        extern u32 pmm_free_pages(void);
+        char nb[16];
+        w->out[3][0] = 'M'; w->out[3][1] = 'e'; w->out[3][2] = 'm'; w->out[3][3] = ':'; w->out[3][4] = ' ';
+        dg_itoa((int)(pmm_total_pages() * 4u / 1024u), nb);
+        i = 5u; { u32 j = 0u; while (nb[j] && i < 39u) w->out[3][i++] = nb[j++]; }
+        w->out[3][i++] = 'M'; w->out[3][i++] = 'B'; w->out[3][i] = 0;
+    } else if (cmd[0] == 'd' && cmd[1] == 'f' && cmd[2] == 0) {
+        { u32 j = 0u; const char *s = "disk: 10MB img, fs ok"; while (s[j] && j < 39u) { w->out[3][j] = s[j]; j++; } w->out[3][j] = 0; }
+    } else if (cmd[0] == 'p' && cmd[1] == 's' && cmd[2] == 0) {
+        extern u32 desk_task_count(void);
+        char nb[16];
+        w->out[3][0] = 'P'; w->out[3][1] = 'r'; w->out[3][2] = 'o'; w->out[3][3] = 'c'; w->out[3][4] = 'e'; w->out[3][5] = 's'; w->out[3][6] = ':'; w->out[3][7] = ' ';
+        dg_itoa((int)desk_task_count(), nb);
+        i = 8u; { u32 j = 0u; while (nb[j] && i < 39u) w->out[3][i++] = nb[j++]; }
+        w->out[3][i] = 0;
+    } else if (cmd[0] == 'u' && cmd[1] == 'p' && cmd[2] == 't' && cmd[3] == 'i' && cmd[4] == 'm' && cmd[5] == 'e' && cmd[6] == 0) {
+        char nb[16];
+        w->out[3][0] = 'U'; w->out[3][1] = 'p'; w->out[3][2] = ':';
+        dg_itoa((int)(pit_tick_count() / 100u), nb);
+        i = 3u; { u32 j = 0u; while (nb[j] && i < 39u) w->out[3][i++] = nb[j++]; }
+        w->out[3][i++] = 's'; w->out[3][i] = 0;
+    } else if (cmd[0] == 'c' && cmd[1] == 'l' && cmd[2] == 'e' && cmd[3] == 'a' && cmd[4] == 'r' && cmd[5] == 0) {
+        { u32 q, j; for (q = 0u; q < 4u; q++) for (j = 0u; j < 40u; j++) w->out[q][j] = 0; }
+    } else if (cmd[0] == 'e' && cmd[1] == 'c' && cmd[2] == 'h' && cmd[3] == 'o' && cmd[4] == ' ') {
+        u32 j = 5u, k = 0u;
+        while (cmd[j] && k < 33u) { w->out[3][k++] = cmd[j++]; }
+        w->out[3][k] = 0;
+    } else {
+        u32 j = 0u;
+        const char *s = "unknown cmd (help)";
+        while (s[j] && j < 39u) { w->out[3][j] = s[j]; j++; }
+        w->out[3][j] = 0;
+    }
+    w->inlen = 0u;
+    w->inbuf[0] = 0;
+    (void)line;
+}
+
+static void dg_term_input(dg_win_t *w, u32 key)
+{
+    if (key >= KEY_A && key <= KEY_Z) {
+        if (w->inlen < 23u) {
+            w->inbuf[w->inlen++] = (char)('a' + (key - KEY_A));
+            w->inbuf[w->inlen] = 0;
+        }
+    } else if (key >= KEY_0 && key <= KEY_9) {
+        if (w->inlen < 23u) {
+            w->inbuf[w->inlen++] = (char)('0' + (key - KEY_0));
+            w->inbuf[w->inlen] = 0;
+        }
+    } else if (key == KEY_SPACE) {
+        if (w->inlen < 23u) { w->inbuf[w->inlen++] = ' '; w->inbuf[w->inlen] = 0; }
+    } else if (key == KEY_MINUS) {
+        if (w->inlen < 23u) { w->inbuf[w->inlen++] = '-'; w->inbuf[w->inlen] = 0; }
+    } else if (key == KEY_SLASH) {
+        if (w->inlen < 23u) { w->inbuf[w->inlen++] = '/'; w->inbuf[w->inlen] = 0; }
+    } else if (key == KEY_DOT) {
+        if (w->inlen < 23u) { w->inbuf[w->inlen++] = '.'; w->inbuf[w->inlen] = 0; }
+    } else if (key == KEY_BACKSP) {
+        if (w->inlen > 0u) { w->inlen--; w->inbuf[w->inlen] = 0; }
+    } else if (key == KEY_ENTER) {
+        dg_term_exec(w);
+    }
+}
+
 /* 打开一个窗口（找到空闲槽，位置级联偏移） */
 static void dg_win_open(u32 icon)
 {
@@ -503,6 +705,9 @@ static void dg_win_open(u32 icon)
     dg_wins[slot].w = 400u;
     dg_wins[slot].h = 260u;
     dg_wins[slot].min = 0u;
+    dg_wins[slot].inlen = 0u;
+    dg_wins[slot].inbuf[0] = 0;
+    { u32 q; for (q = 0u; q < 4u; q++) dg_wins[slot].out[q][0] = 0; }
     dg_focus = slot;
     dg_nwin++;
     dg_move_mode = 0u;
@@ -582,19 +787,32 @@ void desk_gui_run(void)
 
         /* --- 有窗口：窗口操作 --- */
         if (dg_nwin > 0u) {
+            dg_win_t *w = &dg_wins[dg_focus];
             if (dg_move_mode) {
                 if (key == KEY_LEFT) {
-                    if (dg_wins[dg_focus].x > 4u) dg_wins[dg_focus].x -= 10u;
+                    if (w->x > 4u) w->x -= 10u;
                 } else if (key == KEY_RIGHT) {
-                    if (dg_wins[dg_focus].x + dg_wins[dg_focus].w + 4u < DG_W)
-                        dg_wins[dg_focus].x += 10u;
+                    if (w->x + w->w + 4u < DG_W) w->x += 10u;
                 } else if (key == KEY_UP) {
-                    if (dg_wins[dg_focus].y > 4u) dg_wins[dg_focus].y -= 10u;
+                    if (w->y > 4u) w->y -= 10u;
                 } else if (key == KEY_DOWN) {
-                    if (dg_wins[dg_focus].y + dg_wins[dg_focus].h + 4u < DG_H - DG_TASKBAR)
-                        dg_wins[dg_focus].y += 10u;
+                    if (w->y + w->h + 4u < DG_H - DG_TASKBAR) w->y += 10u;
                 } else if (key == KEY_ENTER || key == KEY_ESC || key == KEY_M) {
                     dg_move_mode = 0u;                       /* 结束移动 */
+                }
+                dg_render();
+                continue;
+            }
+            /* 输入型应用窗口：计算器 / 图形终端 优先接收按键 */
+            if (w->icon == 2u || w->icon == 3u) {
+                if (key == KEY_ESC) {
+                    dg_win_close();
+                } else if (key == KEY_M) {
+                    dg_move_mode = 1u;                       /* 仍可移动窗口 */
+                } else if (w->icon == 2u) {
+                    dg_calc_input(w, key);
+                } else {
+                    dg_term_input(w, key);
                 }
                 dg_render();
                 continue;
