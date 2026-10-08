@@ -365,6 +365,52 @@ int vmm_map_page(vmm_mm_t *mm, u32 vaddr, u32 phys, u32 flags)
     return VMM_OK;
 }
 
+/* --------------------------------------------------------------------------
+ * 设备内存映射（MMIO，S35 图形桌面 LFB）
+ * 内核驱动（如 VBE 帧缓冲）需要把 PCI/MMIO 设备地址映射进高端内核区。
+ * 普通映射接口因 vmm_is_kernel_addr 检查而拒绝高端地址，这里提供受控例外：
+ *   - 只允许映射到高端内核区（vaddr >= KERNEL_SPACE_BASE），防止误用于用户区
+ *   - 不登记反向映射（设备地址不在 RAM，不参与换页回收）
+ * ------------------------------------------------------------------------ */
+int vmm_map_device(vmm_mm_t *mm, u32 vaddr, u32 phys, u32 flags)
+{
+    u32 *pte;
+    u32 val;
+
+    if (!mm || !phys) return VMM_EINVAL;
+    if (!PAGE_IS_ALIGNED(vaddr) || !PAGE_IS_ALIGNED(phys)) return VMM_EINVAL;
+    if (vaddr < KERNEL_SPACE_BASE) return VMM_EPERM;   /* 仅高端内核区可做设备映射 */
+
+    pte = vmm_walk(mm, vaddr, 1);
+    if (!pte) return VMM_ENOMEM;
+
+    val = (phys & PTE_PFN_MASK) | (flags & ~PTE_PFN_MASK) | PTE_P;
+    *pte = val;
+    vmm_flush_tlb_page(vaddr);
+    return VMM_OK;
+}
+
+/* 大页设备映射（PSE 4MB，供 2MB/4MB 对齐的帧缓冲一次建表） */
+int vmm_map_device_huge(vmm_mm_t *mm, u32 vaddr, u32 phys, u32 flags)
+{
+    u32 pi;
+    u32 *pmd;
+
+    if (!mm) return VMM_EINVAL;
+    if (!vmm_pse_ok) return VMM_EPERM;
+    if (vaddr & (PGDIR_SIZE - 1u)) return VMM_EINVAL;
+    if (phys  & (PGDIR_SIZE - 1u)) return VMM_EINVAL;
+    if (vaddr < KERNEL_SPACE_BASE) return VMM_EPERM;   /* 仅高端内核区 */
+
+    pi = vmm_pgd_index(vaddr);
+    pmd = &mm->pgd[pi];
+    if (*pmd & PTE_P) return VMM_EBUSY;     /* 已有映射（含小页页表） */
+
+    *pmd = (phys & PTE_PFN_MASK) | (flags & ~PTE_PFN_MASK) | PTE_P | PTE_PS;
+    vmm_flush_tlb_all();
+    return VMM_OK;
+}
+
 int vmm_unmap_page(vmm_mm_t *mm, u32 vaddr)
 {
     u32 *pte;

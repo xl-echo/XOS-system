@@ -50,6 +50,7 @@
 #include "virt.h"     /* 第 33 册：虚拟化支持 */
 #include "shell_interactive.h" /* 交互式终端 Shell（自检通过后接管控制台） */
 #include "login.h"             /* 登录界面（第 34 册：登录界面） */
+#include "desk_gui.h"          /* 图形桌面（第 35 册：图形桌面主入口） */
 
 #define XOS_VERSION "0.2.0"
 
@@ -980,6 +981,9 @@ summary:
         con_puts("  System self-check passed. Starting login...\n");
         con_flush();
         login_run();
+        con_puts("  Starting graphical desktop...\n");
+        con_flush();
+        desk_gui_run();                     /* 图形桌面；Esc 退出回文本终端 */
         con_puts("  Entering interactive shell. Type 'help' for commands.\n");
         con_flush();
         shell_interactive();

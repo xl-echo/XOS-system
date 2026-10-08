@@ -108,6 +108,7 @@ KERNEL_SOURCES = [
     'apps_edit.c',     # 应用层：edit 行编辑器/clip 剪贴板/note 记事本
     'apps_games.c',    # 应用层：snake 贪吃蛇/g2048
     'apps_extra.c',    # 应用层：docs 手册/gsearch/touch/beep/uptime
+    'desk_gui.c',      # 图形桌面（第35册）：VBE 640x480x32 帧缓冲/壁纸/图标/任务栏/时钟/窗口/事件循环
     'kmain.c',
 ]
 

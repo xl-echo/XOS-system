@@ -12,6 +12,7 @@
 #include "../include/fs.h"
 #include "../include/pmm.h"
 #include "../include/pm.h"
+#include "../include/desk_gui.h"
 
 /* ---------------- 端口 IO（8042 软复位用） ---------------- */
 static inline void x_outb(u16 port, u8 val)
@@ -69,6 +70,15 @@ void cmd_touch(u32 argc, char (*argv)[SH_MAX_CMD]);
 void cmd_beep(u32 argc, char (*argv)[SH_MAX_CMD]);
 void cmd_uptime(u32 argc, char (*argv)[SH_MAX_CMD]);
 
+/* 图形桌面（第 35 册）：从终端重新进入桌面 */
+static void cmd_desktop(u32 argc, char (*argv)[SH_MAX_CMD])
+{
+    con_puts("Starting graphical desktop...\n");
+    con_flush();
+    desk_gui_run();
+    con_puts("Desktop exited, back to terminal.\n");
+}
+
 static const struct cmd cmds[] = {
     { "help",     "list commands",       cmd_help },
     { "clear",    "clear screen",        cmd_clear },
@@ -99,6 +109,7 @@ static const struct cmd cmds[] = {
     { "touch",    "create empty file",   cmd_touch },
     { "beep",     "speaker beep",        cmd_beep },
     { "uptime",   "uptime stats",        cmd_uptime },
+    { "desktop",  "graphical desktop",   cmd_desktop },
     { 0, 0, 0 }
 };
 

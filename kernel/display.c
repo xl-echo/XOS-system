@@ -146,12 +146,17 @@ int display_set_mode(u32 idx)
         /* 文本模式：重置光标到左上 */
         vga_write_cursor(0);
     } else if (g_modes[idx].flags & MODE_VBE) {
-        /* VBE 图形模式：Bochs VBE 切换（LFB 启用） */
-        vbe_write(0x0001u, 0x0000u);          /* VBE_DISPI_DISABLED */
-        vbe_write(0x0002u, (u16)g_modes[idx].width);    /* XRES */
-        vbe_write(0x0003u, (u16)g_modes[idx].height);   /* YRES */
-        vbe_write(0x0004u, 0x0020u);          /* BPP=32 */
-        vbe_write(0x0005u, 0x0001u);          /* ENABLED + LFB */
+        /* VBE 图形模式：Bochs VBE 切换（LFB 启用）
+         * 寄存器索引（VBE_DISPI 规范）：0=ID 1=XRES 2=YRES 3=BPP 4=ENABLE */
+        vbe_write(0x0004u, 0x0000u);          /* ENABLE = 0 (DISABLED) */
+        vbe_write(0x0001u, (u16)g_modes[idx].width);    /* XRES */
+        vbe_write(0x0002u, (u16)g_modes[idx].height);   /* YRES */
+        vbe_write(0x0003u, 0x0020u);          /* BPP=32 */
+        vbe_write(0x0004u, 0x0001u | 0x0004u);  /* ENABLE(bit0) + LFB(bit2) */
+        con_printf("  [display] VBE mode: x=%u y=%u bpp=%u en=0x%04x\n",
+                   (u32)vbe_read(0x0001u), (u32)vbe_read(0x0002u),
+                   (u32)vbe_read(0x0003u), (u32)vbe_read(0x0004u));
+        con_flush();
     }
     return 0;
 }

@@ -14,9 +14,9 @@ XOS 构建开始
   [warn] D:\��ϵͳ���������ĵ�\��Ŀ����\xos\kernel\login.c:33:13: warning: 'g_poll_fb' defined but not used [-Wunused-variable]
    33 | static u32  g_poll_fb;
       |             ^~~~~~~~~
-  kernel.bin  : 353928 B  (上限 524288 B)
+  kernel.bin  : 362152 B  (上限 524288 B)
   size        : text	   data	    bss	    dec	    hex	filename
-  size        :  352864	    552	 235296	 588712	  8fba8	D:\��ϵͳ���������ĵ�\��Ŀ����\xos\build\kernel.pe
+  size        :  359004	    552	 235328	 594884	  913c4	D:\��ϵͳ���������ĵ�\��Ŀ����\xos\build\kernel.pe
 [3.5/4] 同步 Stage2 KERNEL_SECS（内核扩容自动更新引导加载扇区数）
 [4/4] 生成磁盘镜像
   kernel 主副本: LBA 33..1056

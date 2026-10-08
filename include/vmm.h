@@ -328,6 +328,8 @@ u32         vmm_pt_pages_used(void);
  * 映射与解除映射（S02 / S07）
  * ============================================================================ */
 int         vmm_map_page(vmm_mm_t *mm, u32 vaddr, u32 phys, u32 flags);
+int         vmm_map_device(vmm_mm_t *mm, u32 vaddr, u32 phys, u32 flags);
+int         vmm_map_device_huge(vmm_mm_t *mm, u32 vaddr, u32 phys, u32 flags);
 int         vmm_unmap_page(vmm_mm_t *mm, u32 vaddr);
 int         vmm_map_range(vmm_mm_t *mm, u32 vaddr, u32 phys, u32 len, u32 flags);
 int         vmm_unmap_range(vmm_mm_t *mm, u32 vaddr, u32 len);
