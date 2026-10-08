@@ -219,45 +219,120 @@ static void dg_icon_pattern(u32 x, u32 y, u32 idx)
     }
 }
 
-/* ---------------- 窗口（模拟图形窗口） ---------------- */
+/* ---------------- 窗口管理器（多窗口：创建/关闭/移动/最小化/切换/Z序） ---------------- */
+#define DG_WIN_MAX   4u
 typedef struct {
     u32  open;
     u32  icon;                 /* 关联图标 */
+    u32  x, y, w, h;           /* 窗口位置与尺寸 */
+    u32  min;                  /* 最小化（缩到任务栏） */
 } dg_win_t;
 
-static dg_win_t dg_win;
+static dg_win_t dg_wins[DG_WIN_MAX];
+static u32  dg_nwin  = 0u;     /* 打开窗口数 */
+static u32  dg_focus = 0u;     /* 焦点窗口索引 */
+static u32  dg_move_mode = 0u; /* 移动模式 */
 
-static void dg_window(void)
+/* 开始菜单 / 右键菜单 状态 */
+#define DG_MENU_NONE   0u
+#define DG_MENU_START  1u
+#define DG_MENU_RIGHT  2u
+static u32  dg_menu    = DG_MENU_NONE;
+static u32  dg_menusel = 0u;
+
+static const char *dg_apps[DG_ICON_N] = {
+    "文件管理器", "文本编辑器", "计算器", "图形终端",
+    "浏览器", "设置中心", "音乐播放器", "游戏中心",
+};
+
+/* 窗口内容（按图标不同） */
+static void dg_win_content(const dg_win_t *w)
 {
-    u32 wx = 130u, wy = 90u, ww = 380u, wh = 250u;
+    u32 body = dg_rgb(0xEE,0xEE,0xEE);
+    u32 fg   = dg_rgb(0x18,0x18,0x18);
+    u32 blue = dg_rgb(0x1E,0x6F,0xD0);
+    u32 gray = dg_rgb(0x60,0x60,0x60);
+    u32 bx = w->x + 16u, by = w->y + 44u;
+    switch (w->icon) {
+    case 0u: /* 文件管理器 */
+        dg_text(bx, by, "/root", blue, body);
+        dg_text(bx, by + 22u, "  [D] docs.txt", fg, body);
+        dg_text(bx, by + 44u, "  [F] note.txt", fg, body);
+        dg_text(bx, by + 66u, "  [S] system.dat", fg, body);
+        dg_text(bx, by + 110u, "按 M 移动窗口  N 最小化  W 切换  Esc 关闭", gray, body);
+        break;
+    case 1u: /* 文本编辑器 */
+        dg_text(bx, by, "note.txt - 文本编辑器", fg, body);
+        dg_text(bx, by + 24u, "XOS 图形桌面已启动。", fg, body);
+        dg_text(bx, by + 48u, "按 M 移动窗口  N 最小化  W 切换  Esc 关闭", gray, body);
+        break;
+    case 2u: /* 计算器 */
+        dg_fill(bx + 4u, by, 120u, 20u, dg_rgb(0x2A,0x3A,0x4A));
+        dg_text(bx + 10u, by + 5u, "0", dg_rgb(0xF0,0xF0,0xF0), dg_rgb(0x2A,0x3A,0x4A));
+        dg_fill(bx + 4u, by + 28u, 24u, 18u, dg_rgb(0xC8,0xCC,0xD0));
+        dg_fill(bx + 34u, by + 28u, 24u, 18u, dg_rgb(0xC8,0xCC,0xD0));
+        dg_fill(bx + 64u, by + 28u, 24u, 18u, dg_rgb(0xC8,0xCC,0xD0));
+        dg_text(bx + 40u, by + 90u, "M 移动  N 最小化  W 切换  Esc 关闭", gray, body);
+        break;
+    case 3u: /* 图形终端 */
+        dg_fill(bx - 8u, by - 8u, w->w - 16u, 100u, dg_rgb(0x10,0x10,0x18));
+        dg_text(bx + 4u, by, "XOS # ", dg_rgb(0x30,0xC0,0x50), dg_rgb(0x10,0x10,0x18));
+        dg_text(bx + 4u, by + 22u, "图形终端已连接桌面。", dg_rgb(0xE0,0xE0,0xE0), dg_rgb(0x10,0x10,0x18));
+        dg_text(bx, by + 130u, "M 移动  N 最小化  W 切换  Esc 关闭", gray, body);
+        break;
+    case 4u: /* 浏览器 */
+        dg_text(bx, by, "XOS 浏览器 - 首页", fg, body);
+        dg_text(bx, by + 24u, "正在加载 https://xos.local ...", blue, body);
+        dg_text(bx, by + 48u, "M 移动  N 最小化  W 切换  Esc 关闭", gray, body);
+        break;
+    case 5u: /* 设置 */
+        dg_text(bx, by, "设置中心", fg, body);
+        dg_text(bx, by + 22u, "  [1] 显示与分辨率", fg, body);
+        dg_text(bx, by + 44u, "  [2] 声音", fg, body);
+        dg_text(bx, by + 66u, "  [3] 网络", fg, body);
+        dg_text(bx, by + 88u, "  [4] 账户", fg, body);
+        dg_text(bx, by + 130u, "M 移动  N 最小化  W 切换  Esc 关闭", gray, body);
+        break;
+    case 6u: /* 音乐 */
+        dg_text(bx, by, "音乐播放器", fg, body);
+        dg_fill(bx + 4u, by + 28u, 120u, 4u, dg_rgb(0x50,0xC8,0x70));
+        dg_text(bx + 4u, by + 52u, "▶ XOS 主题曲", blue, body);
+        dg_text(bx, by + 110u, "M 移动  N 最小化  W 切换  Esc 关闭", gray, body);
+        break;
+    default: /* 游戏 */
+        dg_text(bx, by, "游戏中心", fg, body);
+        dg_text(bx, by + 22u, "  [1] 贪吃蛇", fg, body);
+        dg_text(bx, by + 44u, "  [2] 2048", fg, body);
+        dg_text(bx, by + 110u, "M 移动  N 最小化  W 切换  Esc 关闭", gray, body);
+        break;
+    }
+}
+
+static void dg_window_draw(const dg_win_t *w)
+{
     u32 title = dg_rgb(0x1E,0x3A,0x5F);
     u32 body  = dg_rgb(0xEE,0xEE,0xEE);
-    u32 fg    = dg_rgb(0x18,0x18,0x18);
-    const char *name = dg_icons[dg_win.icon].name;
-    dg_fill(wx, wy, ww, wh, body);
-    dg_fill(wx, wy, ww, 26u, title);
-    dg_text(wx + 10u, wy + 9u, name, dg_rgb(0xF0,0xF0,0xF0), title);
-    dg_rect(wx, wy, ww, wh, dg_rgb(0x0A,0x14,0x22));
+    const char *name = dg_icons[w->icon].name;
+    dg_fill(w->x, w->y, w->w, w->h, body);
+    dg_fill(w->x, w->y, w->w, 26u, title);
+    dg_text(w->x + 10u, w->y + 9u, name, dg_rgb(0xF0,0xF0,0xF0), title);
+    dg_rect(w->x, w->y, w->w, w->h, dg_rgb(0x0A,0x14,0x22));
     /* 关闭按钮 X */
-    dg_fill(wx + ww - 24u, wy + 5u, 18u, 16u, dg_rgb(0xC0,0x30,0x30));
-    dg_char(wx + ww - 20u, wy + 9u, 'X', dg_rgb(0xFF,0xFF,0xFF), dg_rgb(0xC0,0x30,0x30));
-    /* 内容区 */
-    dg_text(wx + 20u, wy + 60u, "XOS 图形桌面窗口", fg, body);
-    dg_text(wx + 20u, wy + 90u, "这是「", fg, body);
-    {
-        u32 tx = wx + 20u + dg_text_w("这是「");
-        dg_text(tx, wy + 90u, name, dg_rgb(0x1E,0x6F,0xD0), body);
-        tx += dg_text_w(name);
-        dg_text(tx, wy + 90u, "」应用窗口。", fg, body);
-    }
-    dg_text(wx + 20u, wy + 120u, "按 [Esc] 关闭窗口", fg, body);
-    dg_text(wx + 20u, wy + 150u, "按 [Esc] 两次退出桌面回终端", dg_rgb(0x60,0x60,0x60), body);
+    dg_fill(w->x + w->w - 24u, w->y + 5u, 18u, 16u, dg_rgb(0xC0,0x30,0x30));
+    dg_char(w->x + w->w - 20u, w->y + 9u, 'X', dg_rgb(0xFF,0xFF,0xFF), dg_rgb(0xC0,0x30,0x30));
+    /* 最小化按钮 _ */
+    dg_fill(w->x + w->w - 48u, w->y + 5u, 18u, 16u, dg_rgb(0x3A,0x5A,0x8A));
+    dg_fill(w->x + w->w - 43u, w->y + 16u, 8u, 2u, dg_rgb(0xF0,0xF0,0xF0));
+    /* 移动模式边框提示 */
+    if (dg_move_mode && w == &dg_wins[dg_focus])
+        dg_rect(w->x - 2u, w->y - 2u, w->w + 4u, w->h + 4u, dg_rgb(0x30,0xC0,0x50));
+    dg_win_content(w);
 }
 
 /* ---------------- 桌面渲染 ---------------- */
 static void dg_render(void)
 {
-    u32 i, x, y;
+    u32 i, x, y, k;
     u32 bar = dg_rgb(0x18,0x1C,0x28);
     u32 txt = dg_rgb(0xE8,0xE8,0xE8);
     u32 sel_c = dg_rgb(0xFF,0xFF,0xFF);
@@ -273,24 +348,55 @@ static void dg_render(void)
         dg_fill(0u, y, DG_W, 1u, dg_rgb(r, g, b));
     }
 
-    /* 2) 图标：两行四列 */
+    /* 2) 图标：两行四列（窗口打开时仍可见，除被窗口遮挡外） */
     for (i = 0; i < DG_ICON_N; i++) {
         u32 col = i % 4u;
         u32 row = i / 4u;
         x = 40u + col * 140u;
         y = 50u + row * 130u;
         dg_icon_pattern(x, y, dg_icons[i].icon);
-        if (i == dg_sel)
+        if (i == dg_sel && dg_nwin == 0u)
             dg_rect(x - 3u, y - 3u, 38u, 38u, sel_c);
         dg_text(x + 2u, y + 36u, dg_icons[i].name, txt, dg_rgb(0x0E,0x22,0x40));
     }
 
-    /* 3) 任务栏 */
+    /* 3) 窗口：非最小化按 Z 序绘制（焦点最后=最上） */
+    for (k = 0u; k < DG_WIN_MAX; k++) {
+        i = (dg_focus + 1u + k) % DG_WIN_MAX;      /* 从焦点后开始，保证焦点最后画 */
+        if (dg_wins[i].open && !dg_wins[i].min)
+            dg_window_draw(&dg_wins[i]);
+    }
+
+    /* 4) 任务栏 */
     dg_fill(0u, DG_H - DG_TASKBAR, DG_W, DG_TASKBAR, bar);
     dg_fill(0u, DG_H - DG_TASKBAR, DG_W, 2u, dg_rgb(0x2E,0x3A,0x4E));
-    /* 开始按钮 */
+    /* 开始按钮（S 打开开始菜单） */
     dg_fill(6u, DG_H - DG_TASKBAR + 5u, 56u, 20u, dg_rgb(0x2F,0x7D,0xE1));
     dg_text(14u, DG_H - DG_TASKBAR + 11u, "XOS", dg_rgb(0xFF,0xFF,0xFF), dg_rgb(0x2F,0x7D,0xE1));
+    /* 状态提示 */
+    dg_text(90u, DG_H - DG_TASKBAR + 11u,
+            "Tab 选择  S 开始  R 菜单  Enter 打开", dg_rgb(0xA0,0xB0,0xC8), bar);
+    /* 最小化窗口的恢复按钮（点击概念：按对应数字键恢复） */
+    if (dg_nwin > 0u) {
+        u32 rbx = 300u;
+        for (i = 0u; i < DG_WIN_MAX; i++) {
+            if (dg_wins[i].open) {
+                dg_fill(rbx, DG_H - DG_TASKBAR + 6u, 34u, 18u,
+                        dg_wins[i].min ? dg_rgb(0x2A,0x4A,0x6A) : dg_rgb(0x2E,0x3E,0x52));
+                tbuf[0] = (char)('1' + i);
+                tbuf[1] = 0;
+                dg_text(rbx + 13u, DG_H - DG_TASKBAR + 12u, tbuf,
+                        dg_wins[i].min ? dg_rgb(0x80,0xC0,0xF0) : dg_rgb(0xE0,0xE0,0xE0), bar);
+                rbx += 40u;
+            }
+        }
+    }
+    /* 系统托盘：网络 + 音量 + 电池 + 通知角标 */
+    dg_fill(DG_W - 150u, DG_H - DG_TASKBAR + 9u, 10u, 10u, dg_rgb(0x30,0xC0,0x50));   /* 网络绿点 */
+    dg_fill(DG_W - 128u, DG_H - DG_TASKBAR + 8u, 12u, 12u, dg_rgb(0xE0,0xB0,0x40));   /* 音量 */
+    dg_fill(DG_W - 128u, DG_H - DG_TASKBAR + 10u, 2u, 8u, dg_rgb(0xE0,0xB0,0x40));
+    dg_rect(DG_W - 108u, DG_H - DG_TASKBAR + 8u, 14u, 12u, dg_rgb(0x80,0xE0,0x90));    /* 电池 */
+    dg_fill(DG_W - 108u, DG_H - DG_TASKBAR + 8u, 10u, 12u, dg_rgb(0x20,0x50,0x30));
     /* 时钟 */
     sec = pit_tick_count() / 100u;
     hh = (10u + sec / 3600u) % 24u;
@@ -303,12 +409,40 @@ static void dg_render(void)
     tbuf[5] = 0;
     dg_text(DG_W - 70u, DG_H - DG_TASKBAR + 11u, tbuf,
             dg_rgb(0xF0,0xF0,0xF0), bar);
-    /* 状态提示 */
-    dg_text(90u, DG_H - DG_TASKBAR + 11u, "Tab 选择  Enter 打开  Esc 退出",
-            dg_rgb(0xA0,0xB0,0xC8), bar);
 
-    /* 4) 窗口层 */
-    if (dg_win.open) dg_window();
+    /* 5) 开始菜单浮层 */
+    if (dg_menu == DG_MENU_START) {
+        u32 mx = 6u, my = DG_H - DG_TASKBAR - DG_ICON_N * 20u - 16u;
+        u32 mw = 190u, mh = DG_ICON_N * 20u + 16u;
+        dg_fill(mx, my, mw, mh, dg_rgb(0x22,0x2A,0x38));
+        dg_rect(mx, my, mw, mh, dg_rgb(0x4A,0x5A,0x78));
+        dg_text(mx + 8u, my + 4u, "XOS 应用程序", dg_rgb(0x80,0xC0,0xF0), dg_rgb(0x22,0x2A,0x38));
+        for (i = 0u; i < DG_ICON_N; i++) {
+            u32 iy = my + 20u + i * 20u;
+            if (i == dg_menusel) dg_fill(mx + 4u, iy, mw - 8u, 18u, dg_rgb(0x2F,0x7D,0xE1));
+            dg_text(mx + 10u, iy + 5u, dg_apps[i],
+                    i == dg_menusel ? dg_rgb(0xFF,0xFF,0xFF) : dg_rgb(0xD0,0xD8,0xE0),
+                    i == dg_menusel ? dg_rgb(0x2F,0x7D,0xE1) : dg_rgb(0x22,0x2A,0x38));
+        }
+        dg_text(mx + 8u, my + mh - 12u, "↑↓ 选择  Enter 启动  Esc 关闭",
+                dg_rgb(0x90,0xA0,0xB8), dg_rgb(0x22,0x2A,0x38));
+    }
+
+    /* 6) 右键菜单浮层 */
+    if (dg_menu == DG_MENU_RIGHT) {
+        static const char *ritems[3] = { "打开", "属性", "关闭窗口" };
+        u32 rx = 40u + (dg_sel % 4u) * 140u + 30u;
+        u32 ry = 50u + (dg_sel / 4u) * 130u + 10u;
+        dg_fill(rx, ry, 150u, 66u, dg_rgb(0x22,0x2A,0x38));
+        dg_rect(rx, ry, 150u, 66u, dg_rgb(0x4A,0x5A,0x78));
+        for (i = 0u; i < 3u; i++) {
+            u32 iy = ry + 6u + i * 20u;
+            if (i == dg_menusel) dg_fill(rx + 4u, iy, 142u, 18u, dg_rgb(0x2F,0x7D,0xE1));
+            dg_text(rx + 10u, iy + 5u, ritems[i],
+                    i == dg_menusel ? dg_rgb(0xFF,0xFF,0xFF) : dg_rgb(0xD0,0xD8,0xE0),
+                    i == dg_menusel ? dg_rgb(0x2F,0x7D,0xE1) : dg_rgb(0x22,0x2A,0x38));
+        }
+    }
 
     con_flush();
 }
@@ -343,42 +477,163 @@ int desk_gui_init(void)
     return 0;
 }
 
+/* 打开一个窗口（找到空闲槽，位置级联偏移） */
+static void dg_win_open(u32 icon)
+{
+    u32 i, slot = DG_WIN_MAX;
+    for (i = 0u; i < DG_WIN_MAX; i++)
+        if (!dg_wins[i].open) { slot = i; break; }
+    if (slot == DG_WIN_MAX) return;             /* 窗口数已满 */
+    dg_wins[slot].open = 1u;
+    dg_wins[slot].icon = icon;
+    dg_wins[slot].x = 100u + (slot % 3u) * 36u;
+    dg_wins[slot].y = 60u + (slot % 3u) * 30u;
+    dg_wins[slot].w = 400u;
+    dg_wins[slot].h = 260u;
+    dg_wins[slot].min = 0u;
+    dg_focus = slot;
+    dg_nwin++;
+    dg_move_mode = 0u;
+}
+
+/* 关闭焦点窗口，焦点跳到最近打开的窗口 */
+static void dg_win_close(void)
+{
+    u32 i;
+    dg_wins[dg_focus].open = 0u;
+    dg_wins[dg_focus].min = 0u;
+    if (dg_nwin > 0u) dg_nwin--;
+    for (i = 0u; i < DG_WIN_MAX; i++) {
+        u32 idx = (dg_focus + DG_WIN_MAX - 1u - i) % DG_WIN_MAX;
+        if (dg_wins[idx].open) { dg_focus = idx; return; }
+    }
+    dg_focus = 0u;
+}
+
 void desk_gui_run(void)
 {
     kbd_event_t ev, tmp;
     if (desk_gui_init() != 0) return;              /* 图形不可用：安全回退文本 Shell */
     while (kbd_read_event(&tmp) == 0) { }           /* 清空残留键盘事件 */
 
-    dg_win.open = 0u;
+    dg_nwin = 0u;
+    dg_focus = 0u;
+    dg_menu = DG_MENU_NONE;
+    dg_menusel = 0u;
+    dg_move_mode = 0u;
     dg_sel = 0u;
     dg_render();
 
     for (;;) {
+        u32 key;
         kbd_poll();
-        if (kbd_read_event(&ev) == 0) {
-            if (ev.type == EV_KEY_DOWN) {
-                if (dg_win.open) {
-                    if (ev.key == KEY_ESC) dg_win.open = 0u;
-                    dg_render();
-                    continue;
-                }
-                if (ev.key == KEY_TAB || ev.key == KEY_RIGHT || ev.key == KEY_DOWN) {
-                    dg_sel = (dg_sel + 1u) % DG_ICON_N;
-                    dg_render();
-                } else if (ev.key == KEY_LEFT || ev.key == KEY_UP) {
-                    dg_sel = (dg_sel + DG_ICON_N - 1u) % DG_ICON_N;
-                    dg_render();
-                } else if (ev.key == KEY_ENTER) {
-                    dg_win.open = 1u;
-                    dg_win.icon = dg_sel;
-                    dg_render();
-                } else if (ev.key == KEY_ESC) {
-                    break;                           /* 退出桌面 → 文本 Shell */
-                }
-            }
+        if (kbd_read_event(&ev) != 0) {
+            __asm__ __volatile__("hlt");
             continue;
         }
-        __asm__ __volatile__("hlt");
+        if (ev.type != EV_KEY_DOWN) continue;
+        key = ev.key;
+
+        /* --- 开始菜单 --- */
+        if (dg_menu == DG_MENU_START) {
+            if (key == KEY_UP || key == KEY_LEFT) {
+                dg_menusel = (dg_menusel + DG_ICON_N - 1u) % DG_ICON_N;
+            } else if (key == KEY_DOWN || key == KEY_RIGHT) {
+                dg_menusel = (dg_menusel + 1u) % DG_ICON_N;
+            } else if (key == KEY_ENTER) {
+                dg_win_open(dg_menusel);
+                dg_menu = DG_MENU_NONE;
+            } else if (key == KEY_ESC) {
+                dg_menu = DG_MENU_NONE;
+            }
+            dg_render();
+            continue;
+        }
+
+        /* --- 右键菜单 --- */
+        if (dg_menu == DG_MENU_RIGHT) {
+            if (key == KEY_UP) {
+                dg_menusel = (dg_menusel + 2u) % 3u;
+            } else if (key == KEY_DOWN) {
+                dg_menusel = (dg_menusel + 1u) % 3u;
+            } else if (key == KEY_ENTER) {
+                if (dg_menusel == 0u) dg_win_open(dg_sel);
+                else if (dg_menusel == 1u) dg_win_open(5u);     /* 属性→设置窗口 */
+                else if (dg_nwin > 0u) dg_win_close();
+                dg_menu = DG_MENU_NONE;
+            } else if (key == KEY_ESC) {
+                dg_menu = DG_MENU_NONE;
+            }
+            dg_render();
+            continue;
+        }
+
+        /* --- 有窗口：窗口操作 --- */
+        if (dg_nwin > 0u) {
+            if (dg_move_mode) {
+                if (key == KEY_LEFT) {
+                    if (dg_wins[dg_focus].x > 4u) dg_wins[dg_focus].x -= 10u;
+                } else if (key == KEY_RIGHT) {
+                    if (dg_wins[dg_focus].x + dg_wins[dg_focus].w + 4u < DG_W)
+                        dg_wins[dg_focus].x += 10u;
+                } else if (key == KEY_UP) {
+                    if (dg_wins[dg_focus].y > 4u) dg_wins[dg_focus].y -= 10u;
+                } else if (key == KEY_DOWN) {
+                    if (dg_wins[dg_focus].y + dg_wins[dg_focus].h + 4u < DG_H - DG_TASKBAR)
+                        dg_wins[dg_focus].y += 10u;
+                } else if (key == KEY_ENTER || key == KEY_ESC || key == KEY_M) {
+                    dg_move_mode = 0u;                       /* 结束移动 */
+                }
+                dg_render();
+                continue;
+            }
+            if (key == KEY_M) {
+                dg_move_mode = 1u;                           /* 进入移动模式 */
+            } else if (key == KEY_N) {
+                dg_wins[dg_focus].min = dg_wins[dg_focus].min ? 0u : 1u;  /* 最小化/恢复 */
+            } else if (key == KEY_W || key == KEY_TAB) {
+                u32 i, next = dg_focus;
+                for (i = 0u; i < DG_WIN_MAX; i++) {          /* 切换焦点（跳过最小化） */
+                    next = (next + 1u) % DG_WIN_MAX;
+                    if (dg_wins[next].open) break;
+                }
+                if (dg_wins[next].open) dg_focus = next;
+            } else if (key >= KEY_1 && key <= KEY_4) {
+                u32 wi = key - KEY_1;                        /* 恢复对应窗口 */
+                if (dg_wins[wi].open) {
+                    dg_wins[wi].min = 0u;
+                    dg_focus = wi;
+                }
+            } else if (key == KEY_ESC) {
+                dg_win_close();
+            } else if (key == KEY_S) {
+                dg_menu = DG_MENU_START;
+                dg_menusel = 0u;
+            } else if (key == KEY_R) {
+                dg_menu = DG_MENU_RIGHT;
+                dg_menusel = 0u;
+            }
+            dg_render();
+            continue;
+        }
+
+        /* --- 无窗口：桌面图标导航 --- */
+        if (key == KEY_TAB || key == KEY_RIGHT || key == KEY_DOWN) {
+            dg_sel = (dg_sel + 1u) % DG_ICON_N;
+        } else if (key == KEY_LEFT || key == KEY_UP) {
+            dg_sel = (dg_sel + DG_ICON_N - 1u) % DG_ICON_N;
+        } else if (key == KEY_ENTER) {
+            dg_win_open(dg_sel);
+        } else if (key == KEY_S) {
+            dg_menu = DG_MENU_START;
+            dg_menusel = 0u;
+        } else if (key == KEY_R) {
+            dg_menu = DG_MENU_RIGHT;
+            dg_menusel = 0u;
+        } else if (key == KEY_ESC) {
+            break;                                         /* 退出桌面 → 文本 Shell */
+        }
+        dg_render();
     }
 
     /* 安全退出：恢复文本模式并清屏（不影响硬件/磁盘） */
