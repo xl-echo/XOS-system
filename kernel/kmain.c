@@ -58,7 +58,7 @@ extern u8 __bss_start[];
 extern u8 __bss_end[];
 
 /* 与 pmm.c 保持一致的内核保留区上界 */
-#define KERNEL_RESERVE_END_CHECK  0x0009FD00u   /* 上限含登录界面 bss；0x9FD00 之下留 160B 余量，未触 0xA0000 VGA 区 */
+#define KERNEL_RESERVE_END_CHECK  0x00140000u   /* .bss 已移至 0x100000 起（linker.ld），检查上限含 .bss 余量 0x140000 */
 
 static u32 tests_run    = 0;
 static u32 tests_failed = 0;
@@ -564,8 +564,16 @@ void kmain(void)
     section("[7/8] Running memory subsystem self-tests...\n");
     report("PMM self-test (alloc/free/reserved/OOM/refcount/poison)",
            "PMM self-test", pmm_selftest());
-    report("Memory extended self-test (buddy/zone/NUMA/hotplug/hugepage/reclaim/scrub/offline)",
-           "Memory subsystem extended self-test", pmm_ext_selftest());
+    {
+        u32 pmm_ext_rc = pmm_ext_selftest();
+        if (pmm_ext_rc) {
+            con_puts("PMM_EXT_RC=");
+            con_put_dec(pmm_ext_rc);
+            con_puts("\n");
+        }
+        report("Memory extended self-test (buddy/zone/NUMA/hotplug/hugepage/reclaim/scrub/offline)",
+               "Memory subsystem extended self-test", pmm_ext_rc);
+    }
     print_mem_ext_stats();
     stage_pause();
 

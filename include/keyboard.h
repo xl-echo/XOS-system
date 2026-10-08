@@ -11,7 +11,7 @@
 #include "types.h"
 
 #define KBD_MAGIC          0x4B424400u  /* "KBD\0" */
-#define KBD_EV_QUEUE       64u          /* 输入事件队列深度 */
+#define KBD_EV_QUEUE       256u         /* 输入事件队列深度（原64：整条命令注入风暴时末尾回车事件易被队列满丢弃） */
 #define KBD_SLOTS_MAX      4u           /* 多键盘槽位 */
 #define KBD_KEYS_MAX       128u         /* 键码空间 */
 #define KBD_LAYOUTS_MAX    3u           /* 布局数 */

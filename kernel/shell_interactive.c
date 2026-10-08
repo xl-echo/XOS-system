@@ -49,6 +49,26 @@ static void cmd_reboot(u32 argc, char (*argv)[SH_MAX_CMD]);
 static void cmd_poweroff(u32 argc, char (*argv)[SH_MAX_CMD]);
 static void cmd_exit(u32 argc, char (*argv)[SH_MAX_CMD]);
 
+/* 应用层命令（apps_*.c，全局导出） */
+void cmd_calc(u32 argc, char (*argv)[SH_MAX_CMD]);
+void cmd_clock(u32 argc, char (*argv)[SH_MAX_CMD]);
+void cmd_setclock(u32 argc, char (*argv)[SH_MAX_CMD]);
+void cmd_sysinfo(u32 argc, char (*argv)[SH_MAX_CMD]);
+void cmd_df(u32 argc, char (*argv)[SH_MAX_CMD]);
+void cmd_ps(u32 argc, char (*argv)[SH_MAX_CMD]);
+void cmd_netinfo(u32 argc, char (*argv)[SH_MAX_CMD]);
+void cmd_about(u32 argc, char (*argv)[SH_MAX_CMD]);
+void cmd_edit(u32 argc, char (*argv)[SH_MAX_CMD]);
+void cmd_clip(u32 argc, char (*argv)[SH_MAX_CMD]);
+void cmd_note(u32 argc, char (*argv)[SH_MAX_CMD]);
+void cmd_snake(u32 argc, char (*argv)[SH_MAX_CMD]);
+void cmd_g2048(u32 argc, char (*argv)[SH_MAX_CMD]);
+void cmd_docs(u32 argc, char (*argv)[SH_MAX_CMD]);
+void cmd_gsearch(u32 argc, char (*argv)[SH_MAX_CMD]);
+void cmd_touch(u32 argc, char (*argv)[SH_MAX_CMD]);
+void cmd_beep(u32 argc, char (*argv)[SH_MAX_CMD]);
+void cmd_uptime(u32 argc, char (*argv)[SH_MAX_CMD]);
+
 static const struct cmd cmds[] = {
     { "help",     "list commands",       cmd_help },
     { "clear",    "clear screen",        cmd_clear },
@@ -60,6 +80,25 @@ static const struct cmd cmds[] = {
     { "poweroff", "power off",           cmd_poweroff },
     { "shutdown", "power off",           cmd_poweroff },
     { "exit",     "exit shell",          cmd_exit },
+    /* 应用层 */
+    { "calc",     "calculator",          cmd_calc },
+    { "clock",    "show clock",          cmd_clock },
+    { "setclock", "set clock HH MM",     cmd_setclock },
+    { "sysinfo",  "system info panel",   cmd_sysinfo },
+    { "df",       "memory disk stats",   cmd_df },
+    { "ps",       "app process table",   cmd_ps },
+    { "netinfo",  "network interface",   cmd_netinfo },
+    { "about",    "version info",        cmd_about },
+    { "edit",     "line editor <file>",  cmd_edit },
+    { "clip",     "clipboard",           cmd_clip },
+    { "note",     "note to /note.txt",   cmd_note },
+    { "snake",    "play snake",          cmd_snake },
+    { "g2048",    "play 2048",           cmd_g2048 },
+    { "docs",     "builtin user manual", cmd_docs },
+    { "gsearch",  "search file by name", cmd_gsearch },
+    { "touch",    "create empty file",   cmd_touch },
+    { "beep",     "speaker beep",        cmd_beep },
+    { "uptime",   "uptime stats",        cmd_uptime },
     { 0, 0, 0 }
 };
 

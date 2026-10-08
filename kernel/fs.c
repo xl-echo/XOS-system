@@ -517,6 +517,7 @@ int fs_open(const char *path, u32 flags)
     f->flags = flags;
     f->pos = 0u;
     f->inode = in;
+    inode_ref(in);        /* fd 持有引用：创建时 refcount=1 属 dentry，fs_close 释放 fd 引用后 data 仍存活 */
     stat_open++;
     return fd;
 }

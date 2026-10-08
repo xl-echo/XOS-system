@@ -16,8 +16,8 @@
 #define PAGE_SHIFT      12u
 #define PAGE_MASK       (PAGE_SIZE - 1u)
 
-/* 受管物理内存上限：128 MB */
-#define PMM_MAX_PHYS    (128u * 1024u * 1024u)
+/* 受管物理内存上限：96 MB（128MB 配置下留 32MB 余量，压缩内核 BSS 占用） */
+#define PMM_MAX_PHYS    (96u * 1024u * 1024u)
 #define PMM_MAX_PAGES   (PMM_MAX_PHYS / PAGE_SIZE)
 
 /* ---- 错误码 ---- */

@@ -16,6 +16,7 @@ XOS 构建脚本
 ============================================================
 """
 import os
+import re
 import subprocess
 import sys
 
@@ -32,9 +33,9 @@ BUILD = os.path.join(ROOT, 'build')
 
 IMG_SIZE = 10 * 1024 * 1024
 STAGE2_SECTORS = 32
-KERNEL_SECTORS = 660          # 登录界面加入后内核扩容至 660*512=337920B
+KERNEL_SECTORS = 1024         # 内核扩容至 1024*512=524288B（为第二期应用层开发预留）
 KERNEL_LBA = 33          # 内核主副本起始 LBA
-BKUP_LBA = 693           # 内核备用副本起始 LBA (KERNEL_LBA + KERNEL_SECTORS)
+BKUP_LBA = 1057          # 内核备用副本起始 LBA (KERNEL_LBA + KERNEL_SECTORS)
 BKUP_SECTORS = KERNEL_SECTORS
 
 # ---- MBR 分区表参数 ----------------------------------------------------
@@ -103,6 +104,10 @@ KERNEL_SOURCES = [
     'virt.c',         # 虚拟化支持（第33册）：hypervisor 探测/CPUID 特性/品牌识别/VirtIO 扫描/ACPI/TSC
     'shell_interactive.c',  # 交互式终端 Shell：自检通过后接管控制台，提供可用命令终端
     'login.c',         # 登录界面（第34册）：文本模式图形化登录/首登创建管理员/失败锁定
+    'apps_basic.c',    # 应用层：calc/clock/setclock/sysinfo/df/ps/netinfo/about
+    'apps_edit.c',     # 应用层：edit 行编辑器/clip 剪贴板/note 记事本
+    'apps_games.c',    # 应用层：snake 贪吃蛇/g2048
+    'apps_extra.c',    # 应用层：docs 手册/gsearch/touch/beep/uptime
     'kmain.c',
 ]
 
@@ -249,6 +254,36 @@ def build_stage2():
     return out
 
 
+def ensure_stage2_kernel_secs(kernel_bin):
+    """内核扩容后自动同步 stage2.S 的 KERNEL_SECS，防止引导只加载部分内核。
+
+    内核二进制所需扇区数 = ceil(size/512) + 16 扇区余量。若当前 stage2.S 声明值
+    小于所需值，则更新常量并重新汇编 Stage2（此后 make_image 使用新 stage2.bin）。
+    这是"内核膨胀 → 引导加载不完整 → 高地址段读空"类问题的结构性防线。
+    """
+    size = os.path.getsize(kernel_bin)
+    need = (size + 511) // 512 + 16
+    if need > KERNEL_SECTORS - 24:   # 给备用副本与分区结构留足空间
+        print('[FAIL] kernel.bin 需 %d 扇区，超过安全上限 %d 扇区（KERNEL_SECTORS=%d）'
+              % (need, KERNEL_SECTORS - 24, KERNEL_SECTORS))
+        sys.exit(1)
+    p = os.path.join(BOOT_DIR, 'stage2.S')
+    src = open(p, encoding='utf-8').read()
+    m = re.search(r'\.equ KERNEL_SECS,\s*(\d+)', src)
+    cur = int(m.group(1)) if m else None
+    if cur is None:
+        print('[WARN] stage2.S 未找到 KERNEL_SECS 定义，跳过自动同步')
+        return None
+    if need <= cur:
+        return None
+    src2 = re.sub(r'\.equ KERNEL_SECS,\s*\d+',
+                  r'.equ KERNEL_SECS,  %d           /* 自动同步：内核 %d B -> %d 扇区 */' % (need, size, need),
+                  src, count=1)
+    open(p, 'w', encoding='utf-8').write(src2)
+    print('  stage2.S KERNEL_SECS 自动更新: %d -> %d (内核 %d B)' % (cur, need, size))
+    return build_stage2()
+
+
 def build_kernel():
     objs = []
     for src in KERNEL_SOURCES:
@@ -323,6 +358,11 @@ def main():
 
     print('[3/4] 构建内核')
     kernel_bin = build_kernel()
+
+    print('[3.5/4] 同步 Stage2 KERNEL_SECS（内核扩容自动更新引导加载扇区数）')
+    stage2_synced = ensure_stage2_kernel_secs(kernel_bin)
+    if stage2_synced is not None:
+        stage2_bin = stage2_synced
 
     print('[4/4] 生成磁盘镜像')
     make_image(boot_bin, stage2_bin, kernel_bin)

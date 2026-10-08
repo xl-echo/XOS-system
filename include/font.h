@@ -14,7 +14,7 @@
 #define FONT_MAX_CACHE   16u
 #define FONT_MAX_FACES   8u
 #define FONT_MAX_FALLBACK 4u
-#define FONT_MAX_GLYPH   32u
+#define FONT_MAX_GLYPH   24u
 #define FONT_NAME_LEN    16u
 
 /* 字体类型 */

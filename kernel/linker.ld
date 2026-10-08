@@ -23,9 +23,12 @@ SECTIONS
         *(.data.*)
     }
 
-    . = ALIGN(16);
-    /* 同时导出带 PE 下划线前缀的别名：汇编侧用 __bss_start，
-     * C 侧（i386-pe 目标）引用会变成 ___bss_start，两者都要可见。 */
+    /* 大 .bss（位图/索引/堆等）不得落在 0xA0000-0xBFFFF VGA/BIOS 保留区：
+     * 原布局 .bss 终点 0xA0520 已越界，static 变量写 VGA 区读回垃圾。
+     * 将 .bss 整体移至 1MB 之上的常规 RAM（0x100000 起），
+     * 由 pmm 保留 [0x100000, 0x140000)；flat 镜像不含 .bss（NOBITS），
+     * stage2 按 __bss_start/__bss_end 清零。 */
+    . = 0x100000;
     PROVIDE(__bss_start = .);
     PROVIDE(___bss_start = .);
     .bss : {

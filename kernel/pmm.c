@@ -25,6 +25,21 @@
 
 #define BITMAP_WORDS    (PMM_MAX_PAGES / 32u)
 
+/* buddy 伙伴索引：各阶位图字偏移 off[o]=Σ_{k<o}(PMM_MAX_PAGES>>k)>>5，
+ * PMM_MAX_PHYS 变更（非 2 的幂）必须同步重算，否则 buddy_off_check 失败。 */
+#define BUDDY_MAX_ORDER   10u
+#define BUDDY_ORDERS      (BUDDY_MAX_ORDER + 1u)
+#define BUDDY_MAP_WORDS   2047u
+#define BUDDY_NONE        0xFFFFFFFFu
+static u32 buddy_map[BUDDY_MAP_WORDS];
+static u32 buddy_hint[BUDDY_ORDERS];
+static u32 buddy_ready = 0;
+static u32 buddy_rebuild_count = 0;
+static u32 buddy_rebuild_set_count = 0;
+static const u16 buddy_off[BUDDY_ORDERS] = {
+    0, 768, 1152, 1344, 1440, 1488, 1512, 1524, 1530, 1533, 1535
+};
+
 /* used=1 表示已被分配；reserved=1 表示永久保留，二者互斥 */
 static u32 used_bitmap[BITMAP_WORDS];
 static u32 resv_bitmap[BITMAP_WORDS];
@@ -74,7 +89,7 @@ u32 pmm_lock_enter_count(void) { return pmm_lock_calls; }
  * 保守保留到 0x80000（共 448KB），确保内核代码段、静态数据、位图
  * 与 .bss（随堆分配器等模块增长）不会被页分配器回收。 */
 #define KERNEL_RESERVE_BASE  0x00010000u
-#define KERNEL_RESERVE_END   0x0009FD00u   /* 与 kmain KERNEL_RESERVE_END_CHECK 对齐：含登录界面 bss，防止堆分配踩入 */
+#define KERNEL_RESERVE_END   0x00140000u   /* 含 .bss（已移至 0x100000 起，见 linker.ld）；防止堆分配踩入内核数据 */
 
 /* ---- 扩展子系统常量（定义在此处，供 pmm_stats 等前置函数使用） ---- */
 #define ZONE_DMA        0
@@ -102,7 +117,9 @@ static void zone_recount(void);
 static void numa_setup(void);
 static void wm_setup(void);
 static void antifrag_reserve(void);
-static void free_page_fill(u32 page);
+static u32  buddy_test(u32 order, u32 block);   /* 供 pmm_init 末尾诊断使用 */
+static u32  antifrag_start_page;                /* 供 pmm_init 末尾诊断使用 */
+static u32  antifrag_pages;static void free_page_fill(u32 page);
 static u32  oom_handle(u32 target);
 
 /* ---- 锁保护内部变体前置声明（公开入口 = 锁包装 + _locked 变体） ---- */
@@ -117,6 +134,7 @@ static int  _pmm_free_huge_locked(u32 phys);
 static int  _pmm_ref_inc_locked(u32 phys);
 static int  _pmm_ref_dec_locked(u32 phys);
 static u32  _pmm_alloc_flags_locked(u32 n, u32 flags);
+static void buddy_remove_page(u32 p);   /* 定义在 S05 段（line ~691），大栈保留路径需同步摘索引 */
 
 /* --------------------------------------------------------------------------
  * 内部：状态位操作（同时维护计数与引用计数）
@@ -351,6 +369,10 @@ u32 pmm_alloc_high_pages(u32 n)
      * 把当前正在使用的栈页释放后再分配给其它用途，导致执行流损坏 */
     for (i = 0; i < n; i++) {
         mark_reserved_page(base + i);
+        /* 关键：绕过伙伴索引直接占页的路径必须同步摘除索引，
+         * 否则 buddy_check() 层级一致性自检失败 → 扩展自检失败 → 系统安全停机。
+         * （buddy_enable 之前调用时 buddy_ready=0，buddy_remove_page 安全跳过。） */
+        buddy_remove_page(base + i);
         zone_add(base + i, 0, -1);   /* 保留页同步移出空闲区计数，维持 zone 自洽 */
     }
     pmm_lock_exit(eflags);
@@ -624,19 +646,7 @@ u32 pmm_poison_check(u32 phys)
 /* ==========================================================================
  * S05 伙伴系统分配与合并
  * ========================================================================== */
-#define BUDDY_MAX_ORDER   10u
-#define BUDDY_ORDERS      (BUDDY_MAX_ORDER + 1u)
-#define BUDDY_MAP_WORDS   2047u
-#define BUDDY_NONE        0xFFFFFFFFu
-
-static u32 buddy_map[BUDDY_MAP_WORDS];
-static u32 buddy_hint[BUDDY_ORDERS];
-static u32 buddy_ready = 0;
-
-/* 各阶位图的字偏移；buddy_off_check() 在运行时校验它与 block_count 一致 */
-static const u16 buddy_off[BUDDY_ORDERS] = {
-    0, 1024, 1536, 1792, 1920, 1984, 2016, 2032, 2040, 2044, 2046
-};
+/* （buddy 宏与数组定义已上移至文件顶部统一区，避免 pmm_init 诊断重复声明） */
 
 static u32 buddy_block_count(u32 order) { return PMM_MAX_PAGES >> order; }
 static u32 buddy_word(u32 order, u32 block) { return (u32)buddy_off[order] + (block >> 5); }
@@ -697,11 +707,19 @@ static void buddy_rebuild(void)
 {
     u32 o, b, n;
     if (!buddy_ready) return;
+    buddy_rebuild_count++;
     memset(buddy_map, 0, sizeof(buddy_map));
     memset(buddy_hint, 0, sizeof(buddy_hint));
     n = buddy_block_count(0);
-    for (b = 0; b < n; b++) {
-        if (page_is_free_raw(b)) buddy_set(0, b);
+    {
+        u32 rb_set_count = 0;
+        for (b = 0; b < n; b++) {
+            if (page_is_free_raw(b)) {
+                rb_set_count++;
+                buddy_set(0, b);
+            }
+        }
+        buddy_rebuild_set_count = rb_set_count;
     }
     for (o = 1; o <= BUDDY_MAX_ORDER; o++) {
         n = buddy_block_count(o);
@@ -814,13 +832,15 @@ static u32 buddy_check(void)
     return 0;
 }
 
-/* 各阶字偏移必须与 block_count 推导值一致，否则层级会互相踩踏 */
+/* 各阶字偏移必须与 block_count 推导值一致，否则层级会互相踩踏。
+ * 每阶占字 = ceil(block_count/32)：(n + 31) >> 5 —— 不能整除下取整，
+ * 否则余数块会溢出写入下一阶的字（如 order-9 48 块需 2 字而非 1 字）。 */
 static u32 buddy_off_check(void)
 {
     u32 o, off = 0;
     for (o = 0; o < BUDDY_ORDERS; o++) {
         if ((u32)buddy_off[o] != off) return 1;
-        off += buddy_block_count(o) >> 5;
+        off += (buddy_block_count(o) + 31u) >> 5;
     }
     if (off > BUDDY_MAP_WORDS) return 2;
     return 0;
@@ -860,8 +880,46 @@ u32 pmm_buddy_selftest(void)
     u32 a, b, order, n;
 
     if (!buddy_ready) return 1;
-    if (buddy_off_check() != 0) return 2;
-    if (buddy_check() != 0) return 3;
+    {
+        u32 bcc = buddy_off_check();
+        u32 bck = buddy_check();
+        if (bcc || bck) {
+            con_puts("BDIAG off=");
+            con_put_dec(bcc);
+            con_puts(" check=");
+            con_put_dec(bck);
+            con_puts(" tp=");
+            con_put_dec(total_pages);
+            con_puts(" mp=");
+            con_put_dec(PMM_MAX_PAGES);
+            con_puts("\n");
+            if (bck) {
+                u32 pb, nbad = 0;
+                for (pb = 0; pb < buddy_block_count(0); pb++) {
+                    if (buddy_test(0, pb) != page_is_free_raw(pb)) {
+                        con_puts("  MISMATCH p=");
+                        con_put_dec(pb);
+                        con_puts(" buddy=");
+                        con_put_dec(buddy_test(0, pb));
+                        con_puts(" used=");
+                        con_put_dec(test_bit(used_bitmap, pb) ? 1u : 0u);
+                        con_puts(" resv=");
+                        con_put_dec(test_bit(resv_bitmap, pb) ? 1u : 0u);
+                        con_puts(" ref=");
+                        con_put_dec(refcnt[pb]);
+                        con_puts("\n");
+                        nbad++;
+                        if (nbad >= 30u) break;   /* 最多打印 30 处 */
+                    }
+                }
+                con_puts("  TOTBAD=");
+                con_put_dec(nbad);
+                con_puts("\n");
+            }
+        }
+        if (bcc != 0) return 2;
+        if (bck != 0) return 3;
+    }
 
     /* 取 8 页块：对齐、全空闲、索引已摘除 */
     a = buddy_take(3);

@@ -937,7 +937,9 @@ int vmm_mm_switch(vmm_mm_t *mm)
 static void vmm_build_identity_pse(void)
 {
     u32 i;
-    u32 max_pgd = PMM_MAX_PHYS >> PGDIR_SHIFT;      /* 128MB / 4MB = 32 */
+    /* 固定映射 0-128MB 物理：高位含 ACPI 表（0x7FF0000 等），
+     * PMM 仅管理 96MB（PMM_MAX_PHYS），多映射区不分配、无冲突。 */
+    u32 max_pgd = (128u * 1024u * 1024u) >> PGDIR_SHIFT;      /* 128MB / 4MB = 32 */
 
     for (i = 0; i < max_pgd; i++) {
         u32 phys = i << PGDIR_SHIFT;
@@ -950,7 +952,8 @@ static void vmm_build_identity_pse(void)
 static int vmm_build_identity_4k(void)
 {
     u32 i, j;
-    u32 max_pgd = PMM_MAX_PHYS >> PGDIR_SHIFT;
+    /* 同 PSE 路径：恒等映射覆盖 0-128MB（含高位 ACPI 区） */
+    u32 max_pgd = (128u * 1024u * 1024u) >> PGDIR_SHIFT;
 
     for (i = 0; i < max_pgd; i++) {
         u32 *pt = vmm_alloc_pt();

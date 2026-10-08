@@ -4,7 +4,7 @@ XOS 构建开始
 [1/4] 构建 MBR
   boot.bin    : 512 B  (OK)
   代码占用    : 430 B / 444 B (余 14 B)
-  分区表      : 1 活动项(类型 0x7f, LBA 1, 1352 扇区) + 3 空项
+  分区表      : 1 活动项(类型 0x7f, LBA 1, 2080 扇区) + 3 空项
   引导签名    : 55 AA (OK)
   完整性校验值: 0xbefe (覆盖 0..443)
   完整性回读  : 0xbefe == 0xbefe (OK)
@@ -14,12 +14,13 @@ XOS 构建开始
   [warn] D:\��ϵͳ���������ĵ�\��Ŀ����\xos\kernel\login.c:33:13: warning: 'g_poll_fb' defined but not used [-Wunused-variable]
    33 | static u32  g_poll_fb;
       |             ^~~~~~~~~
-  kernel.bin  : 337448 B  (上限 337920 B)
+  kernel.bin  : 353928 B  (上限 524288 B)
   size        : text	   data	    bss	    dec	    hex	filename
-  size        :  336016	    552	 249024	 585592	  8ef78	D:\��ϵͳ���������ĵ�\��Ŀ����\xos\build\kernel.pe
+  size        :  352864	    552	 235296	 588712	  8fba8	D:\��ϵͳ���������ĵ�\��Ŀ����\xos\build\kernel.pe
+[3.5/4] 同步 Stage2 KERNEL_SECS（内核扩容自动更新引导加载扇区数）
 [4/4] 生成磁盘镜像
-  kernel 主副本: LBA 33..692
-  kernel 备副本: LBA 693..1352
+  kernel 主副本: LBA 33..1056
+  kernel 备副本: LBA 1057..2080
   xos.img     : 10485760 B  (10 MB)
 ============================================================
 构建成功

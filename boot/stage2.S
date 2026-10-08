@@ -30,8 +30,8 @@
 
 .equ KERNEL_SEG,   0x1000        /* 0x1000:0x0000 = 0x10000 */
 .equ KERNEL_LBA,   33
-.equ KERNEL_SECS,  660           /* 337920B：登录界面加入后内核扩容 */
-.equ BKUP_LBA,     693           /* 备用内核副本，签名损坏时回退 */
+.equ KERNEL_SECS,  716           /* 自动同步：内核 358024 B -> 716 扇区 */           /* 自动同步：内核 353928 B -> 708 扇区 */           /* 当前内核 692 扇区(353928B)+余量；build.py 会在内核扩容时自动同步此值 */
+.equ BKUP_LBA,     1057          /* 备用内核副本 LBA（与 build.py BKUP_LBA 一致），签名损坏时回退 */
 .equ CHUNK_SECS,   32
 .equ MAX_RETRY,    3
 

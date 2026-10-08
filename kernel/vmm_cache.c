@@ -26,8 +26,9 @@
  * key = 页偏移 offset>>12；L1 = key>>6、L2 = key&63。
  * 树是性能索引（find 加速），权威数据仍在 vmm_pgcache_pool：
  * find 命中后校验 backing/used，冲突或陈旧时线性兜底。
+ * L2 必须为 2 的幂（&63 掩码）；L1 收窄仅丢弃高桶（安全 miss）。
  * ------------------------------------------------------------------------ */
-#define VMM_CACHE_L1_SIZE   64u
+#define VMM_CACHE_L1_SIZE   32u
 #define VMM_CACHE_L2_SIZE   64u
 static u16 vmm_cache_l1[VMM_CACHE_L1_SIZE];                          /* 0xFFFF=空 */
 static u16 vmm_cache_l2[VMM_CACHE_L1_SIZE][VMM_CACHE_L2_SIZE];       /* 0xFFFF=空 */

@@ -187,6 +187,10 @@ static void key_handle(u32 slot, u32 key, int down)
             if (c != 0u && !(g_mods & (MOD_CTRL | MOD_ALT))) {
                 ev.type = EV_CHAR; ev.ch = c; ev_push(&ev);
             }
+        } else if (key == KEY_SPACE && !(g_mods & (MOD_CTRL | MOD_ALT))) {
+            /* KEY_SPACE(8) 不在 [KEY_A, KEY_SLASH] 范围内，此前空格不产生
+             * 字符导致 shell 命令粘连（setclock1230 等）。直接映射 ' '。 */
+            ev.type = EV_CHAR; ev.ch = ' '; ev_push(&ev);
         }
         /* 组合键匹配 */
         for (i = 0u; i < g_hot_count; i++) {

@@ -11,7 +11,7 @@
 
 #include "types.h"
 
-#define APP_MAX_PROGS     6u       /* 可同时登记的用户程序描述符数 */
+#define APP_MAX_PROGS     4u       /* 可同时登记的用户程序描述符数 */
 #define APP_MAX_SEGS      4u       /* 每程序段描述符上限 */
 #define APP_MAX_SYMS      16u      /* 每程序符号表条目上限 */
 #define APP_MAX_DEPS      8u       /* 每程序共享库依赖上限 */
