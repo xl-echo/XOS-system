@@ -104,6 +104,7 @@ KERNEL_SOURCES = [
     'virt.c',         # 虚拟化支持（第33册）：hypervisor 探测/CPUID 特性/品牌识别/VirtIO 扫描/ACPI/TSC
     'shell_interactive.c',  # 交互式终端 Shell：自检通过后接管控制台，提供可用命令终端
     'login.c',         # 登录界面（第34册）：文本模式图形化登录/首登创建管理员/失败锁定
+    'login_gui.c',     # 图形登录（第34册）：VBE 图形化登录界面/失败锁定/Esc 回退文本
     'apps_basic.c',    # 应用层：calc/clock/setclock/sysinfo/df/ps/netinfo/about
     'apps_edit.c',     # 应用层：edit 行编辑器/clip 剪贴板/note 记事本
     'apps_games.c',    # 应用层：snake 贪吃蛇/g2048

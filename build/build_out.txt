@@ -14,6 +14,15 @@ XOS 构建开始
   [warn] D:\��ϵͳ���������ĵ�\��Ŀ����\xos\kernel\login.c:33:13: warning: 'g_poll_fb' defined but not used [-Wunused-variable]
    33 | static u32  g_poll_fb;
       |             ^~~~~~~~~
+  [warn] D:\��ϵͳ���������ĵ�\��Ŀ����\xos\kernel\login_gui.c: In function 'lg_remaining':
+D:\��ϵͳ���������ĵ�\��Ŀ����\xos\kernel\login_gui.c:69:19: warning: implicit declaration of function 'pit_tick_count' [-Wimplicit-function-declaration]
+   69 |         u32 el = (pit_tick_count() - lg_locked_tick) / 100u;
+      |                   ^~~~~~~~~~~~~~
+D:\��ϵͳ���������ĵ�\��Ŀ����\xos\kernel\login_gui.c: In function 'lg_draw':
+D:\��ϵͳ���������ĵ�\��Ŀ����\xos\kernel\login_gui.c:78:9: warning: unused variable 'bg' [-Wunused-variable]
+   78 |     u32 bg = dg_rgb(0x10, 0x1E, 0x34);
+      |         ^~
+D:\��ϵͳ��������
   [warn] D:\��ϵͳ���������ĵ�\��Ŀ����\xos\kernel\desk_gui.c: In function 'dg_win_content':
 D:\��ϵͳ���������ĵ�\��Ŀ����\xos\kernel\desk_gui.c:372:20: warning: variable 'pmem' set but not used [-Wunused-but-set-variable]
   372 |             u32 i, pmem, pproc;
@@ -23,9 +32,9 @@ D:\��ϵͳ���������ĵ�\��Ŀ����\xos\kernel\de
       |                 ^
 D:\��ϵͳ���������ĵ�\��Ŀ����\xos\kernel\desk_gui.c: In function 'dg_browser_input':
 D:\��ϵͳ���������ĵ�\��Ŀ����\xos\kernel\desk_gui.c:857:13: warning: u
-  kernel.bin  : 378556 B  (上限 524288 B)
+  kernel.bin  : 382652 B  (上限 524288 B)
   size        : text	   data	    bss	    dec	    hex	filename
-  size        :  375464	    572	 236224	 612260	  957a4	D:\��ϵͳ���������ĵ�\��Ŀ����\xos\build\kernel.pe
+  size        :  380512	    572	 236416	 617500	  96c1c	D:\��ϵͳ���������ĵ�\��Ŀ����\xos\build\kernel.pe
 [3.5/4] 同步 Stage2 KERNEL_SECS（内核扩容自动更新引导加载扇区数）
 [4/4] 生成磁盘镜像
   kernel 主副本: LBA 33..1056

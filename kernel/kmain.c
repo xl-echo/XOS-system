@@ -50,6 +50,7 @@
 #include "virt.h"     /* 第 33 册：虚拟化支持 */
 #include "shell_interactive.h" /* 交互式终端 Shell（自检通过后接管控制台） */
 #include "login.h"             /* 登录界面（第 34 册：登录界面） */
+#include "login_gui.h"         /* 图形登录（VBE 640x480x32） */
 #include "desk_gui.h"          /* 图形桌面（第 35 册：图形桌面主入口） */
 
 #define XOS_VERSION "0.2.0"
@@ -980,7 +981,11 @@ summary:
     if (tests_failed == 0) {
         con_puts("  System self-check passed. Starting login...\n");
         con_flush();
-        login_run();
+        if (login_gui_run() != 0) {           /* 图形登录；失败回退文本登录 */
+            con_clear();
+            con_set_cursor(0u, 0u);
+            login_run();
+        }
         con_puts("  Starting graphical desktop...\n");
         con_flush();
         desk_gui_run();                     /* 图形桌面；Esc 退出回文本终端 */

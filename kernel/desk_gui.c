@@ -45,12 +45,12 @@ static inline void dgpix(u32 x, u32 y, u32 c)
     if (x < DG_W && y < DG_H) dg_fb[y * DG_W + x] = c;
 }
 
-static inline u32 dg_rgb(u32 r, u32 g, u32 b)
+u32 dg_rgb(u32 r, u32 g, u32 b)
 {
     return (r << 16) | (g << 8) | b;
 }
 
-static void dg_fill(u32 x, u32 y, u32 w, u32 h, u32 c)
+void dg_fill(u32 x, u32 y, u32 w, u32 h, u32 c)
 {
     u32 i, j;
     if (x >= DG_W || y >= DG_H) return;
@@ -61,7 +61,7 @@ static void dg_fill(u32 x, u32 y, u32 w, u32 h, u32 c)
             dg_fb[(y + j) * DG_W + (x + i)] = c;
 }
 
-static void dg_rect(u32 x, u32 y, u32 w, u32 h, u32 c)
+void dg_rect(u32 x, u32 y, u32 w, u32 h, u32 c)
 {
     u32 i;
     for (i = 0; i < w; i++) { dgpix(x + i, y, c); dgpix(x + i, y + h - 1u, c); }
@@ -136,7 +136,7 @@ static void dg_char(u32 x, u32 y, u8 ch, u32 fg, u32 bg)
         }
 }
 
-static void dg_text(u32 x, u32 y, const char *s, u32 fg, u32 bg)
+void dg_text(u32 x, u32 y, const char *s, u32 fg, u32 bg)
 {
     if (!s) return;
     while (*s) {
