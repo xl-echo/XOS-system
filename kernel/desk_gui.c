@@ -15,6 +15,7 @@
 #include "console.h"
 #include "irq.h"
 #include "string.h"
+#include "fs.h"
 
 extern void *memset(void *dst, int c, unsigned int n);
 
@@ -254,12 +255,23 @@ static void dg_win_content(const dg_win_t *w)
     u32 gray = dg_rgb(0x60,0x60,0x60);
     u32 bx = w->x + 16u, by = w->y + 44u;
     switch (w->icon) {
-    case 0u: /* 文件管理器 */
-        dg_text(bx, by, "/root", blue, body);
-        dg_text(bx, by + 22u, "  [D] docs.txt", fg, body);
-        dg_text(bx, by + 44u, "  [F] note.txt", fg, body);
-        dg_text(bx, by + 66u, "  [S] system.dat", fg, body);
-        dg_text(bx, by + 110u, "按 M 移动窗口  N 最小化  W 切换  Esc 关闭", gray, body);
+    case 0u: /* 文件管理器：真实列出根目录 */
+        {
+            char nm[128];
+            u32 di = 0u, ln = 0u;
+            dg_text(bx, by, "/ (root)", blue, body);
+            while (di < 64u) {
+                if (fs_readdir("/", di, nm) != 0) break;
+                if (nm[0] == 0) break;
+                dg_text(bx, by + 22u + ln * 22u, "  [F]", blue, body);
+                dg_text(bx + 34u, by + 22u + ln * 22u, nm, fg, body);
+                ln++;
+                di++;
+                if (ln >= 5u) break;
+            }
+            if (!ln) dg_text(bx, by + 22u, "(empty)", gray, body);
+            dg_text(bx, by + 132u, "M 移动  N 最小化  W 切换  Esc 关闭", gray, body);
+        }
         break;
     case 1u: /* 文本编辑器 */
         dg_text(bx, by, "note.txt - 文本编辑器", fg, body);

@@ -14,14 +14,14 @@ XOS 构建开始
   [warn] D:\��ϵͳ���������ĵ�\��Ŀ����\xos\kernel\login.c:33:13: warning: 'g_poll_fb' defined but not used [-Wunused-variable]
    33 | static u32  g_poll_fb;
       |             ^~~~~~~~~
-  [warn] D:\��ϵͳ���������ĵ�\��Ŀ����\xos\kernel\desk_gui.c:131:12: warning: 'dg_text_w' defined but not used [-Wunused-function]
-  131 | static u32 dg_text_w(const char *s)
+  [warn] D:\��ϵͳ���������ĵ�\��Ŀ����\xos\kernel\desk_gui.c:132:12: warning: 'dg_text_w' defined but not used [-Wunused-function]
+  132 | static u32 dg_text_w(const char *s)
       |            ^~~~~~~~~
-  kernel.bin  : 366248 B  (上限 524288 B)
+  kernel.bin  : 370344 B  (上限 524288 B)
   size        : text	   data	    bss	    dec	    hex	filename
-  size        :  365068	    552	 235456	 601076	  92bf4	D:\��ϵͳ���������ĵ�\��Ŀ����\xos\build\kernel.pe
+  size        :  365924	    552	 235456	 601932	  92f4c	D:\��ϵͳ���������ĵ�\��Ŀ����\xos\build\kernel.pe
 [3.5/4] 同步 Stage2 KERNEL_SECS（内核扩容自动更新引导加载扇区数）
-  stage2.S KERNEL_SECS 自动更新: 724 -> 732 (内核 366248 B)
+  stage2.S KERNEL_SECS 自动更新: 732 -> 740 (内核 370344 B)
   stage2.bin  : 2968 B  (上限 16384 B)
 [4/4] 生成磁盘镜像
   kernel 主副本: LBA 33..1056
