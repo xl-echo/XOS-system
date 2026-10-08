@@ -21,7 +21,8 @@ extern void *memset(void *dst, int c, unsigned int n);
 
 /* ---------------- 32bpp 帧缓冲访问 ---------------- */
 static volatile u32 *dg_fb = (volatile u32 *)DG_LFB;
-static u32 dg_sel = 0u;              /* 当前选中图标索引 */
+static u32 dg_sel = 0u;
+static void dg_itoa(int v, char *out);              /* 当前选中图标索引 */
 
 static inline void dgpix(u32 x, u32 y, u32 c)
 {
@@ -276,10 +277,13 @@ static void dg_win_content(const dg_win_t *w)
             dg_text(bx, by + 132u, "M 移动  N 最小化  W 切换  Esc 关闭", gray, body);
         }
         break;
-    case 1u: /* 文本编辑器 */
+    case 1u: /* 文本编辑器：真实输入 + 保存到 /note.txt */
         dg_text(bx, by, "note.txt - 文本编辑器", fg, body);
-        dg_text(bx, by + 24u, "XOS 图形桌面已启动。", fg, body);
-        dg_text(bx, by + 48u, "按 M 移动窗口  N 最小化  W 切换  Esc 关闭", gray, body);
+        dg_text(bx + 4u, by + 22u, w->inlen ? w->inbuf : "(输入文本，Enter 保存)",
+                dg_rgb(0xF0,0xF0,0xF0), body);
+        dg_text(bx + 4u, by + 44u, w->out[0], gray, body);
+        dg_text(bx + 4u, by + 66u, "已保存到真实文件系统 /note.txt", blue, body);
+        dg_text(bx, by + 132u, "字母数字输入  Enter保存  Esc关闭  M移动", gray, body);
         break;
     case 2u: /* 计算器：真实输入与四则求值 */
         {
@@ -313,11 +317,40 @@ static void dg_win_content(const dg_win_t *w)
             dg_text(bx, by + 132u, "输入命令: help echo mem df ps uptime clear", gray, body);
             break;
         }
-    case 4u: /* 浏览器 */
-        dg_text(bx, by, "XOS 浏览器 - 首页", fg, body);
-        dg_text(bx, by + 24u, "正在加载 https://xos.local ...", blue, body);
-        dg_text(bx, by + 48u, "M 移动  N 最小化  W 切换  Esc 关闭", gray, body);
-        break;
+    case 4u: /* 浏览器：地址栏 + 内置页面 */
+        {
+            const char *pg = w->out[0][0] ? w->out[0] : "home";
+            dg_text(bx, by, "地址: xos://", fg, body);
+            dg_text(bx + 68u, by, w->inlen ? w->inbuf : "home", blue, body);
+            if (pg[0] == 'a' && pg[1] == 'b' && pg[2] == 'o' && pg[3] == 'u' && pg[4] == 't') {
+                dg_text(bx + 4u, by + 28u, "关于 XOS", fg, body);
+                dg_text(bx + 4u, by + 50u, "XOS 0.3.0 完全自研 x86 桌面操作系统", dg_rgb(0xE0,0xE0,0xE0), body);
+                dg_text(bx + 4u, by + 72u, "内核 / 文件系统 / 图形界面均独立实现", dg_rgb(0xE0,0xE0,0xE0), body);
+                dg_text(bx + 4u, by + 94u, "不依赖任何外部商业或闭源组件", dg_rgb(0xE0,0xE0,0xE0), body);
+            } else if (pg[0] == 's' && pg[1] == 'y' && pg[2] == 's') {
+                extern u32 pmm_total_pages(void);
+                extern u32 desk_task_count(void);
+                char nb[16];
+                dg_text(bx + 4u, by + 28u, "系统状态", fg, body);
+                dg_text(bx + 4u, by + 50u, "内存: 128 MB  (4K 页)", dg_rgb(0xE0,0xE0,0xE0), body);
+                dg_text(bx + 4u, by + 72u, "进程数: ", dg_rgb(0xE0,0xE0,0xE0), body);
+                dg_itoa((int)desk_task_count(), nb);
+                dg_text(bx + 72u, by + 72u, nb, dg_rgb(0x30,0xC0,0x50), body);
+                dg_text(bx + 4u, by + 94u, "显示: 640x480x32  VBE 帧缓冲", dg_rgb(0xE0,0xE0,0xE0), body);
+            } else if (pg[0] == 'h' && pg[1] == 'e' && pg[2] == 'l' && pg[3] == 'p') {
+                dg_text(bx + 4u, by + 28u, "桌面快捷键", fg, body);
+                dg_text(bx + 4u, by + 50u, "M 移动窗口  N 最小化  1-4 恢复", dg_rgb(0xE0,0xE0,0xE0), body);
+                dg_text(bx + 4u, by + 72u, "W/Tab 切换窗口  S 开始菜单  R 右键", dg_rgb(0xE0,0xE0,0xE0), body);
+                dg_text(bx + 4u, by + 94u, "Esc 关闭窗口 / 退出桌面", dg_rgb(0xE0,0xE0,0xE0), body);
+            } else {
+                dg_text(bx + 4u, by + 28u, "XOS 浏览器", fg, body);
+                dg_text(bx + 4u, by + 50u, "内置页面: 1 关于  2 系统  3 帮助", dg_rgb(0xE0,0xE0,0xE0), body);
+                dg_text(bx + 4u, by + 72u, "输入 xos://about 等地址回车导航", dg_rgb(0xE0,0xE0,0xE0), body);
+                dg_text(bx + 4u, by + 94u, "（无网络栈，内置页面离线可用）", gray, body);
+            }
+            dg_text(bx, by + 132u, "输入地址  Enter导航  Esc关闭  M移动", gray, body);
+            break;
+        }
     case 5u: /* 设置：真实系统信息 */
         {
             u32 i, pmem, pproc;
@@ -691,6 +724,89 @@ static void dg_term_input(dg_win_t *w, u32 key)
     }
 }
 
+/* 文本编辑器：输入 + 保存到真实文件系统 */
+static void dg_edit_input(dg_win_t *w, u32 key)
+{
+    if (key >= KEY_A && key <= KEY_Z) {
+        if (w->inlen < 23u) {
+            w->inbuf[w->inlen++] = (char)('a' + (key - KEY_A));
+            w->inbuf[w->inlen] = 0;
+        }
+    } else if (key >= KEY_0 && key <= KEY_9) {
+        if (w->inlen < 23u) {
+            w->inbuf[w->inlen++] = (char)('0' + (key - KEY_0));
+            w->inbuf[w->inlen] = 0;
+        }
+    } else if (key == KEY_SPACE) {
+        if (w->inlen < 23u) { w->inbuf[w->inlen++] = ' '; w->inbuf[w->inlen] = 0; }
+    } else if (key == KEY_DOT) {
+        if (w->inlen < 23u) { w->inbuf[w->inlen++] = '.'; w->inbuf[w->inlen] = 0; }
+    } else if (key == KEY_COMMA) {
+        if (w->inlen < 23u) { w->inbuf[w->inlen++] = ','; w->inbuf[w->inlen] = 0; }
+    } else if (key == KEY_MINUS) {
+        if (w->inlen < 23u) { w->inbuf[w->inlen++] = '-'; w->inbuf[w->inlen] = 0; }
+    } else if (key == KEY_BACKSP) {
+        if (w->inlen > 0u) { w->inlen--; w->inbuf[w->inlen] = 0; }
+    } else if (key == KEY_ENTER) {
+        /* 保存当前行到 /note.txt（真实文件系统） */
+        int fd = fs_open("/note.txt", O_WRITE | O_CREAT | O_APPEND);
+        if (fd >= 0) {
+            u32 i = 0u;
+            if (w->inlen) fs_write(fd, w->inbuf, w->inlen);
+            fs_write(fd, "\n", 1);
+            fs_close(fd);
+            /* 回显到 out 缓冲首行 */
+            while (w->inbuf[i] && i < 39u) { w->out[0][i] = w->inbuf[i]; i++; }
+            w->out[0][i] = 0;
+        } else {
+            u32 i = 0u;
+            const char *s = "save failed";
+            while (s[i] && i < 39u) { w->out[0][i] = s[i]; i++; }
+            w->out[0][i] = 0;
+        }
+        w->inlen = 0u;
+        w->inbuf[0] = 0;
+    }
+}
+
+/* 浏览器：内置页面导航 */
+static void dg_browser_input(dg_win_t *w, u32 key)
+{
+    if (key >= KEY_A && key <= KEY_Z) {
+        if (w->inlen < 23u) {
+            w->inbuf[w->inlen++] = (char)('a' + (key - KEY_A));
+            w->inbuf[w->inlen] = 0;
+        }
+    } else if (key >= KEY_0 && key <= KEY_9) {
+        if (w->inlen < 23u) {
+            w->inbuf[w->inlen++] = (char)('0' + (key - KEY_0));
+            w->inbuf[w->inlen] = 0;
+        }
+    } else if (key == KEY_SPACE) {
+        if (w->inlen < 23u) { w->inbuf[w->inlen++] = ' '; w->inbuf[w->inlen] = 0; }
+    } else if (key == KEY_DOT) {
+        if (w->inlen < 23u) { w->inbuf[w->inlen++] = '.'; w->inbuf[w->inlen] = 0; }
+    } else if (key == KEY_SLASH) {
+        if (w->inlen < 23u) { w->inbuf[w->inlen++] = '/'; w->inbuf[w->inlen] = 0; }
+    } else if (key == KEY_BACKSP) {
+        if (w->inlen > 0u) { w->inlen--; w->inbuf[w->inlen] = 0; }
+    } else if (key == KEY_ENTER) {
+        /* 导航：匹配 xos:// 前缀页面 */
+        u32 i = 0u;
+        const char *pg;
+        const char *s = w->inbuf;
+        if (s[0] == '1' && s[1] == 0) pg = "about";
+        else if (s[0] == '2' && s[1] == 0) pg = "sys";
+        else if (s[0] == '3' && s[1] == 0) pg = "help";
+        else if (s[0] == 'x' && s[1] == 'o' && s[2] == 's' && s[3] == ':' && s[4] == '/' && s[5] == '/')
+            pg = s + 6;
+        else pg = "home";
+        { u32 j = 0u; while (pg[j] && j < 39u) { w->out[0][j] = pg[j]; j++; } w->out[0][j] = 0; }
+        w->inlen = 0u;
+        w->inbuf[0] = 0;
+    }
+}
+
 /* 打开一个窗口（找到空闲槽，位置级联偏移） */
 static void dg_win_open(u32 icon)
 {
@@ -803,16 +919,20 @@ void desk_gui_run(void)
                 dg_render();
                 continue;
             }
-            /* 输入型应用窗口：计算器 / 图形终端 优先接收按键 */
-            if (w->icon == 2u || w->icon == 3u) {
+            /* 输入型应用窗口：编辑器 / 计算器 / 终端 / 浏览器 优先接收按键 */
+            if (w->icon == 1u || w->icon == 2u || w->icon == 3u || w->icon == 4u) {
                 if (key == KEY_ESC) {
                     dg_win_close();
                 } else if (key == KEY_M) {
                     dg_move_mode = 1u;                       /* 仍可移动窗口 */
+                } else if (w->icon == 1u) {
+                    dg_edit_input(w, key);
                 } else if (w->icon == 2u) {
                     dg_calc_input(w, key);
-                } else {
+                } else if (w->icon == 3u) {
                     dg_term_input(w, key);
+                } else {
+                    dg_browser_input(w, key);
                 }
                 dg_render();
                 continue;
