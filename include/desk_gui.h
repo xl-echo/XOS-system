@@ -11,7 +11,7 @@
 #define DG_H          480u
 #define DG_LFB        0xE0000000u      /* Bochs VBE 线性帧缓冲基址 */
 #define DG_TASKBAR    30u              /* 任务栏高度（像素） */
-#define DG_ICON_N     10u              /* 桌面图标数量 */
+#define DG_ICON_N     11u              /* 桌面图标数量 */
 
 int  desk_gui_init(void);              /* 切 VBE 640x480x32 + 映射 LFB；0=成功 */
 void desk_gui_run(void);               /* 渲染桌面 + 事件循环；Esc 退出回文本 Shell */

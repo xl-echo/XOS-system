@@ -16,6 +16,8 @@
 #include "irq.h"
 #include "string.h"
 #include "fs.h"
+#include "pmm.h"
+#include "task.h"
 
 extern void *memset(void *dst, int c, unsigned int n);
 
@@ -171,7 +173,7 @@ typedef struct {
 static const dg_icon_t dg_icons[DG_ICON_N] = {
     { "文件", 0u }, { "文本", 1u }, { "计算器", 2u }, { "终端", 3u },
     { "浏览器", 4u }, { "设置", 5u }, { "音乐", 6u }, { "游戏", 7u },
-    { "照片", 8u }, { "时钟", 9u },
+    { "照片", 8u }, { "时钟", 9u }, { "监控", 10u },
 };
 
 /* 图标图案：32x32 方块，用几何色块组合（像素风，全自研） */
@@ -189,6 +191,7 @@ static void dg_icon_pattern(u32 x, u32 y, u32 idx)
     case 7u: c1 = dg_rgb(0x30,0x34,0x3C); c2 = dg_rgb(0xE0,0x48,0x48); c3 = dg_rgb(0x48,0xB8,0xE0); break; /* 游戏 */
     case 8u: c1 = dg_rgb(0xE8,0xA0,0x40); c2 = dg_rgb(0xF8,0xE0,0xB0); c3 = dg_rgb(0xA0,0x60,0x20); break; /* 照片 */
     case 9u: c1 = dg_rgb(0x28,0x3A,0x50); c2 = dg_rgb(0xE8,0xE8,0xE8); c3 = dg_rgb(0x58,0x88,0xC0); break; /* 时钟 */
+    case 10u: c1 = dg_rgb(0x1E,0x3A,0x24); c2 = dg_rgb(0x90,0xE8,0x90); c3 = dg_rgb(0x40,0x80,0x40); break; /* 监控 */
     default: c1 = c2 = c3 = dg_rgb(0x60,0x60,0x60); break;
     }
     dg_fill(x, y, 32u, 32u, c1);                     /* 底 */
@@ -254,6 +257,11 @@ static void dg_icon_pattern(u32 x, u32 y, u32 idx)
         dg_fill(x + 15u, y + 8u, 2u, 16u, c3);
         dg_fill(x + 8u, y + 15u, 16u, 2u, c3);
         break;
+    case 10u:   /* 监控：柱状图 */
+        dg_fill(x + 8u, y + 6u, 5u, 4u, c3);
+        dg_fill(x + 14u, y + 10u, 5u, 10u, c2);
+        dg_fill(x + 20u, y + 8u, 5u, 8u, c1);
+        break;
     default:
         break;
     }
@@ -286,8 +294,19 @@ static u32  dg_menusel = 0u;
 static const char *dg_apps[DG_ICON_N] = {
     "文件管理器", "文本编辑器", "计算器", "图形终端",
     "浏览器", "设置中心", "音乐播放器", "游戏中心",
-    "照片查看器", "时钟日历",
+    "照片查看器", "时钟日历", "系统监控",
 };
+
+/* 无符号整数转字符串 */
+static void dg_u2s(u32 v, char *out)
+{
+    char t[12];
+    int n = 0, i;
+    if (v == 0u) { out[0] = '0'; out[1] = 0; return; }
+    while (v > 0u) { t[n++] = (char)('0' + (v % 10u)); v /= 10u; }
+    for (i = 0; i < n; i++) out[i] = t[n - 1 - i];
+    out[n] = 0;
+}
 
 /* 窗口内容（按图标不同） */
 static void dg_win_content(const dg_win_t *w)
@@ -395,7 +414,6 @@ static void dg_win_content(const dg_win_t *w)
         {
             u32 i, pmem, pproc;
             extern u32 pmm_total_pages(void);
-            extern u32 pmm_free_pages(void);
             extern u32 desk_task_count(void);
             pmem = pmm_total_pages() * 4u / 1024u;         /* MB */
             pproc = desk_task_count();
@@ -479,7 +497,49 @@ static void dg_win_content(const dg_win_t *w)
             dg_text(bx, by + 150u, "数字键 1/2/3 切换图片  M 移动  N 最小化  Esc 关闭", gray, body);
             break;
         }
-    case 9u: /* 时钟日历：实时时间 + 日期 */
+    case 10u: /* 系统监控 */
+        {
+            pmm_stats_t pst;
+            task_stats_t tst;
+            char b1[16], b2[16], b3[16], b4[16];
+            u32 tpages, fpages, upages, kb;
+            task_stats(&tst);
+            pmm_stats(&pst);
+            tpages = pmm_total_pages();
+            fpages = pmm_free_page_count();
+            upages = pmm_used_pages();
+            dg_text(bx, by, "XOS 系统监控", fg, body);
+            kb = tpages * 4u;
+            dg_u2s(kb, b1); dg_u2s(upages * 4u, b2); dg_u2s(fpages * 4u, b3);
+            dg_text(bx + 4u, by + 24u, "内存总计: ", dg_rgb(0xAA,0xFF,0xAA), body);
+            dg_text(bx + 74u, by + 24u, b1, fg, body);
+            dg_text(bx + 110u, by + 24u, " KB  已用: ", gray, body);
+            dg_text(bx + 190u, by + 24u, b2, fg, body);
+            dg_text(bx + 226u, by + 24u, " KB  空闲: ", gray, body);
+            dg_text(bx + 306u, by + 24u, b3, fg, body);
+            dg_text(bx + 342u, by + 24u, " KB", gray, body);
+            dg_u2s(tst.task_count, b1); dg_u2s(tst.ready_count, b2);
+            dg_u2s(tst.zombie_count, b3); dg_u2s(tst.switch_total, b4);
+            dg_text(bx + 4u, by + 48u, "任务数: ", dg_rgb(0xAA,0xFF,0xAA), body);
+            dg_text(bx + 74u, by + 48u, b1, fg, body);
+            dg_text(bx + 100u, by + 48u, "  就绪: ", gray, body);
+            dg_text(bx + 160u, by + 48u, b2, fg, body);
+            dg_text(bx + 186u, by + 48u, "  僵尸: ", gray, body);
+            dg_text(bx + 246u, by + 48u, b3, fg, body);
+            dg_text(bx + 272u, by + 48u, "  切换: ", gray, body);
+            dg_text(bx + 332u, by + 48u, b4, fg, body);
+            dg_u2s(tst.ticks_total / 100u, b1);
+            dg_text(bx + 4u, by + 72u, "运行时间: ", dg_rgb(0xAA,0xFF,0xAA), body);
+            dg_text(bx + 74u, by + 72u, b1, fg, body);
+            dg_text(bx + 100u, by + 72u, " 秒  版本: XOS 0.3.0  内核: 0x00100000-0x00138520", gray, body);
+            dg_text(bx + 4u, by + 96u, "空闲区: ", dg_rgb(0xAA,0xFF,0xAA), body);
+            dg_u2s(pst.free_regions, b1);
+            dg_text(bx + 74u, by + 96u, b1, fg, body);
+            dg_text(bx + 100u, by + 96u, "  (按 U 刷新)", gray, body);
+            dg_text(bx, by + 132u, "U刷新  Esc关闭  M移动", gray, body);
+        }
+        break;
+    case 9u: /* 时钟日历 + 秒表 */
         {
             u32 sec, hh, mm;
             char nb[24];
@@ -849,7 +909,6 @@ static void dg_term_exec(dg_win_t *w)
         { u32 j = 0u; const char *s = "help echo mem df ps uptime clear"; while (s[j] && j < 39u) { w->out[3][j] = s[j]; j++; } w->out[3][j] = 0; }
     } else if (cmd[0] == 'm' && cmd[1] == 'e' && cmd[2] == 'm' && cmd[3] == 0) {
         extern u32 pmm_total_pages(void);
-        extern u32 pmm_free_pages(void);
         char nb[16];
         w->out[3][0] = 'M'; w->out[3][1] = 'e'; w->out[3][2] = 'm'; w->out[3][3] = ':'; w->out[3][4] = ' ';
         dg_itoa((int)(pmm_total_pages() * 4u / 1024u), nb);
