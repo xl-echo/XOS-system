@@ -24,6 +24,29 @@
 #define FT_DEV      3u
 #define FT_PROC     4u
 
+/* 权限位（inode.mode 低 9 位，类 Unix rwx） */
+#define FS_S_IRWXU  0x1C0u   /* owner rwx */
+#define FS_S_IRUSR  0x100u
+#define FS_S_IWUSR  0x080u
+#define FS_S_IXUSR  0x040u
+#define FS_S_IRWXG  0x038u   /* group rwx */
+#define FS_S_IRGRP  0x020u
+#define FS_S_IWGRP  0x010u
+#define FS_S_IXGRP  0x008u
+#define FS_S_IRWXO  0x007u   /* other rwx */
+#define FS_S_IROTH  0x004u
+#define FS_S_IWOTH  0x002u
+#define FS_S_IXOTH  0x001u
+
+/* 常用默认权限 */
+#define FS_DEF_DIR  0x1FFu   /* drwxrwxrwx */
+#define FS_DEF_FILE 0x1B6u   /* -rw-rw-rw- */
+
+/* 访问意图掩码（fs_perm_check 的 want 参数）：每档内 r/w/x 位 */
+#define FS_ACC_R  4u
+#define FS_ACC_W  2u
+#define FS_ACC_X  1u
+
 /* 打开方式 */
 #define O_READ      0x01u
 #define O_WRITE     0x02u
@@ -71,7 +94,9 @@ typedef struct {
 struct fs_inode {
     u32           ino;
     u32           type;      /* FT_* */
-    u32           mode;      /* 低 9 位权限位：owner rw=0x1C0 */
+    u32           mode;      /* 低 9 位权限位：owner/group/other rwx */
+    u32           uid;       /* 属主 */
+    u32           gid;       /* 属组 */
     u32           size;
     u32           refcount;
     u32           flags;     /* 位0=只读挂载 */
@@ -143,5 +168,12 @@ int    fs_stat(const char *path, u32 *size, u32 *type);
 int    fs_readdir(const char *path, u32 idx, char *name);
 void   fs_dump(void);
 u32    fs_selftest(void);
+
+/* FFS v2：权限与属主 */
+void   fs_set_cur_uid(u32 uid);
+u32    fs_get_cur_uid(void);
+int    fs_chmod(const char *path, u32 mode);
+int    fs_chown(const char *path, u32 uid, u32 gid);
+int    fs_perm_check(const fs_inode_t *in, u32 want);
 
 #endif /* XOS_FS_H */

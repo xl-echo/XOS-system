@@ -54,6 +54,45 @@ static void inode_unref(fs_inode_t *in)
     }
 }
 
+/* ---------------- FFS v2：属主与权限模型 ---------------- */
+static u32 g_fs_cur_uid;   /* 当前进程有效用户 */
+static u32 g_fs_cur_gid;
+
+void fs_set_cur_uid(u32 uid) { g_fs_cur_uid = uid; }
+u32  fs_get_cur_uid(void)    { return g_fs_cur_uid; }
+
+/* 访问权检查：want 为 FS_ACC_R/W/X（每档内的读/写/执行意图）；
+ * 按 owner/group/other 三档映射后判 mode。root(uid=0) 全权。 */
+int fs_perm_check(const fs_inode_t *in, u32 want)
+{
+    u32 shift;
+    if (in == (const fs_inode_t *)0) return FS_EINVAL;
+    if (g_fs_cur_uid == 0u) return FS_OK;                  /* root */
+    if (g_fs_cur_uid == in->uid)      shift = 6u;          /* owner 位 */
+    else if (g_fs_cur_gid == in->gid) shift = 3u;          /* group 位 */
+    else                              shift = 0u;          /* other 位 */
+    if ((in->mode & (want << shift)) != 0u) return FS_OK;
+    return FS_EACCES;
+}
+
+/* inode 出厂初始化：携带当前属主与默认权限 */
+static void inode_init(fs_inode_t *in, u32 type, fs_inode_t *dir)
+{
+    in->ino     = ino_seq++;
+    in->type    = type;
+    in->mode    = (type == FT_DIR) ? FS_DEF_DIR : FS_DEF_FILE;
+    in->uid     = g_fs_cur_uid;
+    in->gid     = g_fs_cur_gid;
+    in->size    = 0u;
+    in->refcount = 1u;
+    in->flags   = dir ? dir->flags : 0u;
+    in->ops     = dir ? dir->ops : (fs_ops_t *)0;
+    in->children = (fs_dentry_t *)0;
+    in->data    = (u8 *)0;
+    in->blocks  = 0u;
+    in->mtime   = 1u;
+}
+
 /* ---------------- tmpfs 操作实现 ---------------- */
 static int tmpfs_trunc(fs_inode_t *in)
 {
@@ -111,21 +150,22 @@ static u32 tmpfs_open(fs_inode_t *dir, const char *name, u32 flags, fs_inode_t *
     d = dentry_find(dir, name);
     if (d) {
         if ((flags & O_WRITE) && (dir->flags & 1u)) return FS_EROFS;
+        /* FFS v2：读需 r、写需 w */
+        if ((flags & O_READ) && fs_perm_check(d->inode, FS_ACC_R) != FS_OK)
+            return FS_EACCES;
+        if ((flags & O_WRITE) && fs_perm_check(d->inode, FS_ACC_W) != FS_OK)
+            return FS_EACCES;
         if (flags & O_TRUNC) tmpfs_trunc(d->inode);
         *out = d->inode;
         inode_ref(d->inode);
         return FS_OK;
     }
     if (!(flags & O_CREAT)) return FS_ENOENT;
+    /* FFS v2：在目录内创建需目录写权限 */
+    if (fs_perm_check(dir, FS_ACC_W) != FS_OK) return FS_EACCES;
     in = kmalloc(sizeof(fs_inode_t), 8u, 0u);
     if (in == (fs_inode_t *)0) return FS_ENOMEM;
-    in->ino = ino_seq++;
-    in->type = FT_REG;
-    in->mode = 0x1C0u;                    /* owner rw */
-    in->size = 0u; in->refcount = 1u; in->flags = dir->flags;
-    in->ops = dir->ops;
-    in->children = (fs_dentry_t *)0;
-    in->data = (u8 *)0; in->blocks = 0u; in->mtime = 1u;
+    inode_init(in, FT_REG, dir);
     d = kmalloc(sizeof(fs_dentry_t), 8u, 0u);
     if (d == (fs_dentry_t *)0) { kfree(in); return FS_ENOMEM; }
     strncpy(d->name, name, FS_NAME_MAX - 1u);
@@ -144,15 +184,11 @@ static int tmpfs_mkdir(fs_inode_t *dir, const char *name)
     if (dir->type != FT_DIR) return FS_ENOTDIR;
     if (!name_valid(name)) return FS_EINVAL;
     if (dentry_find(dir, name)) return FS_EEXIST;
+    /* FFS v2：建目录需父目录写权限 */
+    if (fs_perm_check(dir, FS_ACC_W) != FS_OK) return FS_EACCES;
     in = kmalloc(sizeof(fs_inode_t), 8u, 0u);
     if (in == (fs_inode_t *)0) return FS_ENOMEM;
-    in->ino = ino_seq++;
-    in->type = FT_DIR;
-    in->mode = 0x1C0u;
-    in->size = 0u; in->refcount = 1u; in->flags = dir->flags;
-    in->ops = dir->ops;
-    in->children = (fs_dentry_t *)0;
-    in->data = (u8 *)0; in->blocks = 0u; in->mtime = 1u;
+    inode_init(in, FT_DIR, dir);
     d = kmalloc(sizeof(fs_dentry_t), 8u, 0u);
     if (d == (fs_dentry_t *)0) { kfree(in); return FS_ENOMEM; }
     strncpy(d->name, name, FS_NAME_MAX - 1u);
@@ -168,6 +204,8 @@ static int tmpfs_unlink(fs_inode_t *dir, const char *name)
     fs_dentry_t **pp, *d;
     if (dir->type != FT_DIR) return FS_ENOTDIR;
     if (!name_valid(name)) return FS_EINVAL;
+    /* FFS v2：删除需父目录写权限 */
+    if (fs_perm_check(dir, FS_ACC_W) != FS_OK) return FS_EACCES;
     for (pp = &dir->children; *pp; pp = &(*pp)->next) {
         if (strcmp((*pp)->name, name) == 0) {
             d = *pp;
@@ -440,6 +478,8 @@ static int path_lookup(const char *path, fs_inode_t **out)
         comp[n] = '\0';
         if (n == 0u) { if (*p) p++; continue; }
         if (cur->type != FT_DIR) return FS_ENOTDIR;
+        /* FFS v2：穿越目录需 x 权限 */
+        if (fs_perm_check(cur, FS_ACC_X) != FS_OK) return FS_EACCES;
         d = dentry_find(cur, comp);
         if (d == (fs_dentry_t *)0) return FS_ENOENT;
         cur = d->inode;
@@ -467,6 +507,8 @@ static int path_split(const char *path, fs_inode_t **parent, char *name)
             if (n) {
                 comp[n] = '\0';
                 if (cur->type != FT_DIR) return FS_ENOTDIR;
+                /* FFS v2：穿越目录需 x 权限 */
+                if (fs_perm_check(cur, FS_ACC_X) != FS_OK) return FS_EACCES;
                 d = dentry_find(cur, comp);
                 if (d == (fs_dentry_t *)0) return FS_ENOENT;
                 cur = d->inode;
@@ -635,7 +677,9 @@ void fs_init(void)
 
     root_inode.ino = 1u;
     root_inode.type = FT_DIR;
-    root_inode.mode = 0x1C0u;
+    root_inode.mode = FS_DEF_DIR;
+    root_inode.uid  = 0u;
+    root_inode.gid  = 0u;
     root_inode.size = 0u;
     root_inode.refcount = 1u;
     root_inode.flags = 0u;
@@ -647,6 +691,8 @@ void fs_init(void)
 
     stat_open = stat_read = stat_write = stat_mkdir = stat_unlink = 0u;
     fs_errors = 0u;
+    g_fs_cur_uid = 0u;   /* 默认 root 会话 */
+    g_fs_cur_gid = 0u;
 
     fs_register_type("tmpfs", &tmpfs_ops);
     fs_register_type("devfs", &devfs_ops);
@@ -660,6 +706,30 @@ void fs_init(void)
     devfs_register("fb0",       DEV_MAJ_DISPLAY, 0u, &dev_ops_fb);
     devfs_register("kbd",       DEV_MAJ_INPUT,  0u, &dev_ops_input);
     devfs_register("mouse",     DEV_MAJ_INPUT,  1u, &dev_ops_input);
+}
+
+/* ---------------- FFS v2：chmod/chown ---------------- */
+int fs_chmod(const char *path, u32 mode)
+{
+    fs_inode_t *in;
+    int rc = path_lookup(path, &in);
+    if (rc != FS_OK) return rc;
+    /* 仅 root 或属主可改权限 */
+    if (g_fs_cur_uid != 0u && g_fs_cur_uid != in->uid) return FS_EACCES;
+    in->mode = (in->mode & ~0x1FFu) | (mode & 0x1FFu);
+    return FS_OK;
+}
+
+int fs_chown(const char *path, u32 uid, u32 gid)
+{
+    fs_inode_t *in;
+    int rc = path_lookup(path, &in);
+    if (rc != FS_OK) return rc;
+    /* 仅 root 或属主可改属主 */
+    if (g_fs_cur_uid != 0u && g_fs_cur_uid != in->uid) return FS_EACCES;
+    in->uid = uid;
+    in->gid = gid;
+    return FS_OK;
 }
 
 /* ---------------- 导出 ---------------- */
@@ -836,6 +906,57 @@ u32 fs_selftest(void)
     if (fd < 0) return 81;
     if (fs_read((u32)fd, buf, 1u) != 0) return 82;
     if (fs_close((u32)fd) != FS_OK) return 83;
+
+    /* 22: FFS v2 权限模型——非 root 用户访问控制 */
+    fs_set_cur_uid(100u);                       /* 切换为普通用户 uid=100 */
+    fd = fs_open("/mnt/user.txt", O_READ | O_WRITE | O_CREAT | O_TRUNC);
+    if (fd < 0) return 85;                      /* uid=100 在 other=rwx 的 /mnt 建文件 */
+    if (fs_write((u32)fd, "perm", 4u) != 4) return 86;
+    if (fs_close((u32)fd) != FS_OK) return 87;
+
+    /* 23: owner 可 chmod 收紧权限 → 本人读被拒 */
+    if (fs_chmod("/mnt/user.txt", 0u) != FS_OK) return 88;       /* 属主可改 */
+    if (fs_open("/mnt/user.txt", O_READ) != FS_EACCES) return 89;
+    if (fs_chmod("/mnt/user.txt", FS_DEF_FILE) != FS_OK) return 90;
+    if (fs_open("/mnt/user.txt", O_READ) < 0) return 91;         /* 恢复后可读 */
+
+    /* 24: 非 owner 无权限（uid=200 访问 uid=100 的文件） */
+    fs_set_cur_uid(200u);
+    if (fs_chmod("/mnt/user.txt", FS_DEF_FILE) != FS_EACCES) return 92;  /* 非属主不可 chmod */
+    if (fs_chown("/mnt/user.txt", 1u, 0u) != FS_EACCES) return 93;       /* 非属主不可 chown */
+    fd = fs_open("/mnt/user.txt", O_READ);      /* other=rw- 仍可读 */
+    if (fd < 0) return 94;
+    if (fs_close((u32)fd) != FS_OK) return 95;
+
+    /* 25: 目录穿越权限（去掉 x → 无法进入） */
+    fs_set_cur_uid(100u);
+    if (fs_mkdir("/mnt/lock") != FS_OK) return 96;
+    if (fs_chmod("/mnt/lock", FS_S_IRUSR) != FS_OK) return 97;   /* owner r 无 x */
+    fd = fs_open("/mnt/lock/secret.txt", O_READ | O_WRITE | O_CREAT | O_TRUNC);
+    if (fd != FS_EACCES) return 98;             /* 无 x 无法穿越目录 */
+    if (fs_chmod("/mnt/lock", FS_DEF_DIR) != FS_OK) return 99;
+    if (fs_chown("/mnt/lock", 200u, 0u) != FS_OK) return 100;    /* 属主 chown */
+    fs_set_cur_uid(200u);                        /* 新属主访问 */
+    fd = fs_open("/mnt/lock/secret.txt", O_READ | O_WRITE | O_CREAT | O_TRUNC);
+    if (fd < 0) return 101;
+    if (fs_close((u32)fd) != FS_OK) return 102;
+    if (fs_unlink("/mnt/lock/secret.txt") != FS_OK) return 103;
+    if (fs_unlink("/mnt/lock") != FS_OK) return 104;
+    if (fs_unlink("/mnt/user.txt") != FS_OK) return 105;
+
+    /* 26: root 全权（uid=0 可改任意文件） */
+    fs_set_cur_uid(0u);
+    fd = fs_open("/mnt/root.txt", O_READ | O_WRITE | O_CREAT | O_TRUNC);
+    if (fd < 0) return 106;
+    if (fs_close((u32)fd) != FS_OK) return 107;
+    if (fs_chmod("/mnt/root.txt", 0x1B6u) != FS_OK) return 108;
+    if (fs_unlink("/mnt/root.txt") != FS_OK) return 109;
+
+    /* 27: chmod 后 readdir 语义保持（目录枚举不因权限变化而失败） */
+    if (fs_mkdir("/mnt/v2") != FS_OK) return 110;
+    if (fs_chmod("/mnt/v2", FS_S_IRUSR | FS_S_IXUSR) != FS_OK) return 111;
+    if (fs_readdir("/mnt", 0u, name) != FS_OK) return 112;       /* root 可枚举 */
+    if (fs_unlink("/mnt/v2") != FS_OK) return 113;
 
     return 0;
 }
