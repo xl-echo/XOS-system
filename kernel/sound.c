@@ -905,6 +905,191 @@ u32 sound_note_freq(u8 note)
     return f / 1000u;
 }
 
+/* ============================================================================
+ * 波形合成器（synth，自研）
+ * 覆盖：正弦/方波/三角波/锯齿波/白噪声五种波形、可调占空比、
+ *       ADSR 四段包络、PCM 缓冲渲染、MIDI 旋律播放（PC 扬声器真实发声）。
+ * 全部整数运算（定点），无浮点依赖，可在无 FPU 环境运行。
+ * ========================================================================== */
+
+/* 波形类型 */
+#define SYNTH_SINE     0u
+#define SYNTH_SQUARE   1u
+#define SYNTH_TRIANGLE 2u
+#define SYNTH_SAW      3u
+#define SYNTH_NOISE    4u
+
+#define SYNTH_TABLE_SZ 256u                 /* 正弦查表点数 */
+
+/* 正弦查表（int16，-32767..32767），phase 0..SYNTH_TABLE_SZ-1 */
+static const i16 synth_sin_tab[SYNTH_TABLE_SZ] = {
+      0,  804, 1607, 2410, 3211, 4011, 4807, 5601,
+   6392, 7179, 7961, 8739, 9511,10278,11038,11792,
+  12539,13278,14009,14732,15446,16151,16845,17530,
+  18204,18868,19519,20159,20787,21402,22004,22594,
+  23169,23731,24278,24811,25329,25831,26318,26789,
+  27244,27683,28105,28510,28898,29268,29621,29955,
+  30272,30571,30852,31113,31356,31580,31785,31971,
+  32137,32284,32412,32520,32609,32678,32727,32757,
+  32767,32757,32727,32678,32609,32520,32412,32284,
+  32137,31971,31785,31580,31356,31113,30852,30571,
+  30272,29955,29621,29268,28898,28510,28105,27683,
+  27244,26789,26318,25831,25329,24811,24278,23731,
+  23169,22594,22004,21402,20787,20159,19519,18868,
+  18204,17530,16845,16151,15446,14732,14009,13278,
+  12539,11792,11038,10278, 9511, 8739, 7961, 7179,
+   6392, 5601, 4807, 4011, 3211, 2410, 1607,  804,
+      0, -804,-1607,-2410,-3211,-4011,-4807,-5601,
+  -6392,-7179,-7961,-8739,-9511,-10278,-11038,-11792,
+ -12539,-13278,-14009,-14732,-15446,-16151,-16845,-17530,
+ -18204,-18868,-19519,-20159,-20787,-21402,-22004,-22594,
+ -23169,-23731,-24278,-24811,-25329,-25831,-26318,-26789,
+ -27244,-27683,-28105,-28510,-28898,-29268,-29621,-29955,
+ -30272,-30571,-30852,-31113,-31356,-31580,-31785,-31971,
+ -32137,-32284,-32412,-32520,-32609,-32678,-32727,-32757,
+ -32767,-32757,-32727,-32678,-32609,-32520,-32412,-32284,
+ -32137,-31971,-31785,-31580,-31356,-31113,-30852,-30571,
+ -30272,-29955,-29621,-29268,-28898,-28510,-28105,-27683,
+ -27244,-26789,-26318,-25831,-25329,-24811,-24278,-23731,
+ -23169,-22594,-22004,-21402,-20787,-20159,-19519,-18868,
+ -18204,-17530,-16845,-16151,-15446,-14732,-14009,-13278,
+ -12539,-11792,-11038,-10278, -9511, -8739, -7961, -7179,
+  -6392, -5601, -4807, -4011, -3211, -2410, -1607,  -804,
+};
+
+/* 白噪声 LFSR（xorshift16） */
+static u16 synth_lfsr = 0xACE1u;
+static u16 synth_noise_next(void)
+{
+    u16 x = synth_lfsr;
+    x ^= (u16)(x << 7);
+    x ^= (u16)(x >> 9);
+    x ^= (u16)(x << 8);
+    synth_lfsr = x;
+    return x;
+}
+
+/* 单样本合成：phase=周期内相位（0..SYNTH_TABLE_SZ-1），duty=方波占空 0..100 */
+i16 synth_wave_sample(u8 wave, u32 phase, u16 duty)
+{
+    u32 p = phase & (SYNTH_TABLE_SZ - 1u);
+    switch (wave) {
+    case SYNTH_SINE:
+        return synth_sin_tab[p];
+    case SYNTH_SQUARE: {
+        u32 on = (u32)((u16)(duty & 100u) * SYNTH_TABLE_SZ) / 100u;
+        return (p < on) ? 32767 : -32767;
+    }
+    case SYNTH_TRIANGLE: {
+        u32 half = SYNTH_TABLE_SZ / 2u;
+        i32 v;
+        if (p < half) v = (i32)p * 2 - (i32)half;            /* -128..127 → 归一到半幅 */
+        else          v = (i32)(SYNTH_TABLE_SZ - p) * 2 - (i32)half;
+        return (i16)((v * 32767) / (i32)half);               /* -32767..32767 */
+    }
+    case SYNTH_SAW:
+        return (i16)(((i32)p * 2 - (i32)(SYNTH_TABLE_SZ - 1u)) * 32767
+                     / (i32)(SYNTH_TABLE_SZ - 1u));
+    case SYNTH_NOISE:
+        return (i16)(((i32)(synth_noise_next() & 0x7FFFu) * 2) - 32767);
+    default:
+        return 0;
+    }
+}
+
+/* ADSR 包络增益（0..1000）：t 为当前样本，seg 各段样本长。
+ * 攻击线性升、衰减指数近似、保持恒定、释放线性降。 */
+u16 synth_adsr_gain(u32 t, u32 a, u32 d, u32 s, u32 r, u32 total)
+{
+    if (t < a) return (u16)(1000u * t / (a ? a : 1u));       /* A */
+    t -= a;
+    if (t < d) {                                             /* D */
+        u32 k = d ? (1000u * (d - t) / d) : 0u;              /* 1000→s 线性近似 */
+        u32 base = (u32)s * 10u;                             /* s 为 0..100 */
+        return (u16)(base + (k * (1000u - base)) / 1000u);
+    }
+    t -= d;
+    if (t < s) return (u16)((u32)s * 10u);                   /* S 保持 */
+    t -= s;
+    if (t < r) {                                             /* R */
+        u32 k = r ? (1000u * (r - t) / r) : 0u;
+        return (u16)((u32)s * 10u * k / 1000u);
+    }
+    return 0u;
+}
+
+/* 渲染 wave 波形到 PCM 缓冲（16 位有符号、单声道）。
+ * 每周期相位步进 = 表长 * freq / rate（定点 16.16）。 */
+int synth_render(i16 *buf, u32 samples, u8 wave, u32 freq, u32 rate,
+                 u16 amp, u16 duty)
+{
+    u32 phase = 0u;
+    u32 step;
+    u32 i;
+    i32 s;
+    if (buf == (i16 *)0 || rate == 0u || freq == 0u || freq > rate)
+        return SND_EINVAL;
+    if (amp > 100u) amp = 100u;
+    step = (SYNTH_TABLE_SZ * 65536u) / rate * freq;
+    for (i = 0u; i < samples; i++) {
+        s = (i32)synth_wave_sample(wave, phase >> 16, duty);
+        s = (s * (i32)amp) / 100;
+        buf[i] = (i16)s;
+        phase += step;
+    }
+    return SND_OK;
+}
+
+/* 渲染带 ADSR 包络的波形（attack/decay/sustain/release 样本长） */
+int synth_render_adsr(i16 *buf, u32 samples, u8 wave, u32 freq, u32 rate,
+                      u16 amp, u16 duty, u32 a, u32 d, u32 s, u32 r)
+{
+    u32 phase = 0u;
+    u32 step;
+    u32 i;
+    i32 v;
+    u32 total;
+    if (buf == (i16 *)0 || rate == 0u || freq == 0u || freq > rate)
+        return SND_EINVAL;
+    if (amp > 100u) amp = 100u;
+    total = a + d + s + r;
+    step = (SYNTH_TABLE_SZ * 65536u) / rate * freq;
+    for (i = 0u; i < samples; i++) {
+        u16 g = (total > 0u) ? synth_adsr_gain(i, a, d, s, r, total) : 1000u;
+        v = (i32)synth_wave_sample(wave, phase >> 16, duty);
+        v = (v * (i32)g) / 1000;
+        v = (v * (i32)amp) / 100;
+        buf[i] = (i16)v;
+        phase += step;
+    }
+    return SND_OK;
+}
+
+/* 旋律播放：notes 为 MIDI note 数组，note=0xFF 表示休止。
+ * 通过 PC 扬声器逐音符发声（真实可听），总时长 = len * step_ms。 */
+int sound_melody_play(const u8 *notes, u32 len, u32 step_ms)
+{
+    u32 i;
+    if (notes == (const u8 *)0 || len == 0u) return SND_EINVAL;
+    for (i = 0u; i < len; i++) {
+        if (notes[i] == 0xFFu) {
+            snd_delay_ms(step_ms);
+        } else {
+            u32 f = sound_note_freq(notes[i]);
+            if (f != 0u) sound_tone((u16)f, step_ms);
+        }
+    }
+    return SND_OK;
+}
+
+/* 开机提示音：C4-E4-G4-C5（系统就绪的经典上行和弦） */
+int sound_boot_chime(void)
+{
+    static const u8 notes[] = { 60, 64, 67, 72 };
+    return sound_melody_play(notes, 4u, 120u);
+}
+
+
 /* ---------------- USB 音频（端点模型，自研） ---------------- */
 int sound_usb_register(u16 ep_in, u16 ep_out, u16 alt)
 {
@@ -1147,5 +1332,63 @@ int sound_selftest_dev(void)
     /* 14: 混响恢复关闭，避免影响后续阶段 */
     sound_reverb_set(16, 30, 0);
     sound_eq_set(0, 0, 0, 0);
+
+    /* 15: 波形合成器——单样本关键点 */
+    if (synth_wave_sample(SYNTH_SINE, 0u, 50u) != 0) return 68;        /* sin(0)=0 */
+    if (synth_wave_sample(SYNTH_SINE, 64u, 50u) != 32767) return 69;   /* 90° 峰值 */
+    if (synth_wave_sample(SYNTH_SQUARE, 0u, 50u) != 32767) return 70;
+    if (synth_wave_sample(SYNTH_SQUARE, 128u, 50u) != -32767) return 71;
+    if (synth_wave_sample(SYNTH_SQUARE, 0u, 0u) != -32767) return 72;    /* duty=0 全负 */
+    if (synth_wave_sample(SYNTH_SQUARE, 0u, 100u) != 32767) return 73;   /* duty=100 全正 */
+    if (synth_wave_sample(SYNTH_TRIANGLE, 64u, 50u) != 0) return 74;     /* 中点=0 */
+    if (synth_wave_sample(SYNTH_TRIANGLE, 0u, 50u) != -32767) return 75;
+    if (synth_wave_sample(SYNTH_TRIANGLE, 128u, 50u) != 32767) return 76;
+    {
+        i32 s0 = synth_wave_sample(SYNTH_SAW, 0u, 50u);      /* 锯齿单调递增 */
+        i32 s1 = synth_wave_sample(SYNTH_SAW, 64u, 50u);
+        i32 s2 = synth_wave_sample(SYNTH_SAW, 192u, 50u);
+        if (!(s0 < s1 && s1 < s2)) return 77;
+        if (synth_wave_sample(SYNTH_SAW, 255u, 50u) != 32767) return 78;
+    }
+    {
+        i16 n1 = synth_wave_sample(SYNTH_NOISE, 0u, 50u);    /* 噪声非零且非恒定 */
+        i16 n2 = synth_wave_sample(SYNTH_NOISE, 0u, 50u);
+        i16 n3 = synth_wave_sample(SYNTH_NOISE, 0u, 50u);
+        if (n1 == 0 && n2 == 0 && n3 == 0) return 79;
+        if (n1 == n2 && n2 == n3) return 80;                 /* LFSR 卡死检测 */
+    }
+
+    /* 16: ADSR 包络关键点（A=10,D=10,S=50,R=10） */
+    if (synth_adsr_gain(0u, 10u, 10u, 50u, 10u, 80u) != 0u) return 81;
+    if (synth_adsr_gain(5u, 10u, 10u, 50u, 10u, 80u) != 500u) return 82;   /* A 中 */
+    if (synth_adsr_gain(10u, 10u, 10u, 50u, 10u, 80u) != 1000u) return 83; /* A 顶 */
+    if (synth_adsr_gain(20u, 10u, 10u, 50u, 10u, 80u) != 500u) return 84;  /* S */
+    if (synth_adsr_gain(70u, 10u, 10u, 50u, 10u, 80u) != 500u) return 85;  /* R 起点 */
+    if (synth_adsr_gain(75u, 10u, 10u, 50u, 10u, 80u) != 250u) return 86;  /* R 中 */
+    if (synth_adsr_gain(80u, 10u, 10u, 50u, 10u, 80u) != 0u) return 87;    /* R 末 */
+
+    /* 17: PCM 渲染 */
+    {
+        i16 pcm[256];
+        u32 k, sum = 0u;
+        if (synth_render(pcm, 256u, SYNTH_SQUARE, 440u, 8000u, 80u, 50u) != SND_OK)
+            return 88;
+        for (k = 0u; k < 256u; k++) {
+            if (pcm[k] < -32767 || pcm[k] > 32767) return 89;
+            sum += (u32)(pcm[k] > 0 ? pcm[k] : -pcm[k]);
+        }
+        if (sum == 0u) return 90;                                   /* 无输出 */
+        if (synth_render(pcm, 8u, SYNTH_SINE, 0u, 8000u, 80u, 50u) != SND_EINVAL)
+            return 91;                                              /* freq=0 拒绝 */
+        if (synth_render((i16 *)0, 8u, SYNTH_SINE, 440u, 8000u, 80u, 50u) != SND_EINVAL)
+            return 92;                                              /* buf=NULL 拒绝 */
+        if (synth_render(pcm, 8u, SYNTH_SINE, 9000u, 8000u, 80u, 50u) != SND_EINVAL)
+            return 93;                                              /* freq>rate 拒绝 */
+    }
+
+    /* 18: 旋律参数校验（不实际发声，避免拖慢自检） */
+    if (sound_melody_play((const u8 *)0, 4u, 50u) != SND_EINVAL) return 94;
+    if (sound_melody_play((const u8 *)&m, 0u, 50u) != SND_EINVAL) return 95;
+
     return 0u;
 }

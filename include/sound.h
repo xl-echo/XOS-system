@@ -243,4 +243,20 @@ int      sound_selftest_clock(void);         /* PIT 时钟/音调/发声 */
 int      sound_selftest_misc(void);          /* 省电/恢复/路由/权限/热插拔/统计 */
 int      sound_selftest_dev(void);           /* V2：录音/pan/混音/音效/MIDI/USB/蓝牙/延迟/恢复/校准 */
 
+/* ===== 波形合成器（synth，自研） ===== */
+#define SYNTH_SINE     0u
+#define SYNTH_SQUARE   1u
+#define SYNTH_TRIANGLE 2u
+#define SYNTH_SAW      3u
+#define SYNTH_NOISE    4u
+
+i16      synth_wave_sample(u8 wave, u32 phase, u16 duty);      /* 单样本合成 */
+u16      synth_adsr_gain(u32 t, u32 a, u32 d, u32 s, u32 r, u32 total);
+int      synth_render(i16 *buf, u32 samples, u8 wave, u32 freq, u32 rate,
+                      u16 amp, u16 duty);                       /* PCM 渲染 */
+int      synth_render_adsr(i16 *buf, u32 samples, u8 wave, u32 freq, u32 rate,
+                           u16 amp, u16 duty, u32 a, u32 d, u32 s, u32 r);
+int      sound_melody_play(const u8 *notes, u32 len, u32 step_ms); /* MIDI 旋律播放 */
+int      sound_boot_chime(void);                                  /* 开机提示音 */
+
 #endif /* XOS_SOUND_H */
