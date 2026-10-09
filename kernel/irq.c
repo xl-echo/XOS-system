@@ -30,6 +30,7 @@
 #include "string.h"
 #include "kmalloc.h"
 #include "task.h"     /* 调度器 tick / 抢占挂钩（第 08 册） */
+#include "crash.h"    /* 崩溃转储（panic 停机前写现场） */
 
 /* I/O 端口原语（-nostdinc 无系统头，自实现） */
 static inline void outb(u16 port, u8 val)
@@ -485,6 +486,10 @@ void exc_stack_trace(u32 ebp, u32 limit)
  * ------------------------------------------------------------------------ */
 void panic_regs(isr_regs_t *r)
 {
+    /* 停机前先写崩溃转储（寄存器/控制寄存器/栈快照/回溯链 → 固定内存区），
+     * 重启后 crashdump 命令可读；这是 Linux kdump 的同构自研实现 */
+    crash_dump_write(r);
+
     con_set_color(VGA_WHITE, VGA_RED);
     con_puts("\n======================================================\n");
     con_puts("  XOS KERNEL EXCEPTION (panic)\n");

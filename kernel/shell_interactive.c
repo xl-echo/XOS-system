@@ -16,6 +16,7 @@
 #include "../include/cpu.h"
 #include "../include/user.h"
 #include "../include/xos_hello_bin.h"
+#include "../include/crash.h"
 
 /* ---------------- 端口 IO（8042 软复位用） ---------------- */
 static inline void x_outb(u16 port, u8 val)
@@ -71,6 +72,8 @@ void cmd_docs(u32 argc, char (*argv)[SH_MAX_CMD]);
 void cmd_gsearch(u32 argc, char (*argv)[SH_MAX_CMD]);
 void cmd_touch(u32 argc, char (*argv)[SH_MAX_CMD]);
 void cmd_beep(u32 argc, char (*argv)[SH_MAX_CMD]);
+void cmd_crashdump(u32 argc, char (*argv)[SH_MAX_CMD]);
+void cmd_clearcrash(u32 argc, char (*argv)[SH_MAX_CMD]);
 void cmd_uptime(u32 argc, char (*argv)[SH_MAX_CMD]);
 
 /* 图形桌面（第 35 册）：从终端重新进入桌面 */
@@ -118,6 +121,20 @@ static void cmd_exec(u32 argc, char (*argv)[SH_MAX_CMD])
     user_cleanup();
 }
 
+/* 崩溃转储查看：显示固定内存区保存的 panic 现场 */
+void cmd_crashdump(u32 argc, char (*argv)[SH_MAX_CMD])
+{
+    (void)argc; (void)argv;
+    crash_dump_show();
+}
+
+/* 崩溃转储清除 */
+void cmd_clearcrash(u32 argc, char (*argv)[SH_MAX_CMD])
+{
+    (void)argc; (void)argv;
+    crash_dump_clear();
+}
+
 static const struct cmd cmds[] = {
     { "help",     "list commands",       cmd_help },
     { "clear",    "clear screen",        cmd_clear },
@@ -148,6 +165,8 @@ static const struct cmd cmds[] = {
     { "gsearch",  "search file by name", cmd_gsearch },
     { "touch",    "create empty file",   cmd_touch },
     { "beep",     "speaker beep",        cmd_beep },
+    { "crashdump","show crash dump",     cmd_crashdump },
+    { "clearcrash","clear crash dump",   cmd_clearcrash },
     { "uptime",   "uptime stats",        cmd_uptime },
     { "desktop",  "graphical desktop",   cmd_desktop },
     { 0, 0, 0 }

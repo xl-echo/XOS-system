@@ -48,6 +48,7 @@
 #include "build.h"    /* 第 29 册：构建系统 */
 #include "tester.h"   /* 第 30 册：测试与验证 */
 #include "dbg.h"      /* 第 31 册：调试与监控 */
+#include "crash.h"     /* 崩溃转储：panic 现场持久化 + 启动恢复报告 */
 #include "inst.h"     /* 第 32 册：安装程序-包管理 */
 #include "virt.h"     /* 第 33 册：虚拟化支持 */
 #include "shell_interactive.h" /* 交互式终端 Shell（自检通过后接管控制台） */
@@ -468,6 +469,9 @@ void kmain(void)
     idt_init();
     report("IDT installed & verified (sidt readback + 256 gates)", "IDT + CPU exception handling", idt_selftest());
     stage_pause();
+
+    /* 上次崩溃转储恢复报告（若有）：panic 现场在固定内存区，重启自动汇报 */
+    crash_dump_check();
 
     /* =====================================================================
      * 阶段 2：FPU 初始化（置于 IDT 之后，异常可被捕获）
@@ -978,6 +982,10 @@ void kmain(void)
     report("SELinux matrix / NX-DEP / mem-protect / mitigations / secure-boot / audit / scan / seccomp",
            "Security extended self-test", sec_selftest_ext());
     sec_dump();
+    stage_pause();
+
+    report("crash dump write-back / field integrity / CR regs / stack snapshot / count",
+           "Crash dump self-test", crash_selftest());
     stage_pause();
 
 summary:
