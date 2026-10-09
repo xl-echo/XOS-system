@@ -23,20 +23,18 @@ D:\��ϵͳ���������ĵ�\��Ŀ����\xos\kernel\lo
    79 |     u32 bg = dg_rgb(0x10, 0x1E, 0x34);
       |         ^~
 D:\��ϵͳ��������
-  [warn] D:\��ϵͳ���������ĵ�\��Ŀ����\xos\kernel\desk_gui.c: In function 'dg_browser_input':
-D:\��ϵͳ���������ĵ�\��Ŀ����\xos\kernel\desk_gui.c:1293:13: warning: unused variable 'i' [-Wunused-variable]
- 1293 |         u32 i = 0u;
-      |             ^
-D:\��ϵͳ���������ĵ�\��Ŀ����\xos\kernel\desk_gui.c: In function 'g2048_move':
-D:\��ϵͳ���������ĵ�\��Ŀ����\xos\kernel\desk_gui.c:1342:30: warning: unused variable 'b' [-Wunused-variable]
- 1342 |     u32 moved = 0u, r, c, a, b;
-      |                              ^
-D:\��ϵͳ���������ĵ�\��Ŀ����\xos\kernel\desk_gui.c:1342:27: warning: unused variable 'a' [-Wunused-va
-  kernel.bin  : 554692 B  (上限 2097152 B)
+  [warn] D:\��ϵͳ���������ĵ�\��Ŀ����\xos\kernel\desk_gui.c: In function 'dg_win_content':
+D:\��ϵͳ���������ĵ�\��Ŀ����\xos\kernel\desk_gui.c:926:42: warning: multi-character character constant [-Wmultichar]
+  926 |                 else if (lines[li][0] == '第' || (lines[li][0] >= '0' && lines[li][0] <= '9'))
+      |                                          ^~~~
+D:\��ϵͳ���������ĵ�\��Ŀ����\xos\kernel\desk_gui.c:926:39: warning: comparison is always false due to limited range of data type [-Wtype-limits]
+  926 |                 else if (lines[li][0] == '第' || (lines[li][0] >= '0' && lines[li][0] <= '9'))
+    
+  kernel.bin  : 575256 B  (上限 2097152 B)
   size        : text	   data	    bss	    dec	    hex	filename
-  size        :  553620	    580	 236608	 790808	  c1118	D:\��ϵͳ���������ĵ�\��Ŀ����\xos\build\kernel.pe
+  size        :  574164	    664	 236672	 811500	  c61ec	D:\��ϵͳ���������ĵ�\��Ŀ����\xos\build\kernel.pe
 [3.5/4] 同步 Stage2 KERNEL_SECS（内核扩容自动更新引导加载扇区数）
-  stage2.S KERNEL_SECS 自动更新: 1108 -> 1100 (内核 554692 B)
+  stage2.S KERNEL_SECS 自动更新: 1148 -> 1140 (内核 575256 B)
   stage2.bin  : 3016 B  (上限 16384 B)
 [4/4] 生成磁盘镜像
   kernel 主副本: LBA 33..4128

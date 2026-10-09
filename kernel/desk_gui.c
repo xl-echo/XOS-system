@@ -190,6 +190,9 @@ static const dg_icon_t dg_icons[DG_ICON_N] = {
     { "文件", 0u }, { "文本", 1u }, { "计算器", 2u }, { "终端", 3u },
     { "浏览器", 4u }, { "设置", 5u }, { "音乐", 6u }, { "游戏", 7u },
     { "照片", 8u }, { "时钟", 9u }, { "监控", 10u }, { "天气", 11u },
+    { "任务", 12u }, { "包管理", 13u }, { "图片", 14u }, { "截图", 15u }, { "视频", 16u },
+    { "PDF", 17u }, { "代码", 18u }, { "搜索", 19u }, { "帮助", 20u }, { "自启", 21u },
+    { "文字", 22u }, { "邮件", 23u },
 };
 
 /* 图标图案：32x32 方块，用几何色块组合（像素风，全自研） */
@@ -209,6 +212,18 @@ static void dg_icon_pattern(u32 x, u32 y, u32 idx)
     case 9u: c1 = dg_rgb(0x28,0x3A,0x50); c2 = dg_rgb(0xE8,0xE8,0xE8); c3 = dg_rgb(0x58,0x88,0xC0); break; /* 时钟 */
     case 10u: c1 = dg_rgb(0x1E,0x3A,0x24); c2 = dg_rgb(0x90,0xE8,0x90); c3 = dg_rgb(0x40,0x80,0x40); break; /* 监控 */
     case 11u: c1 = dg_rgb(0x1A,0x3A,0x5E); c2 = dg_rgb(0xE0,0xF0,0xFF); c3 = dg_rgb(0x40,0xA0,0xE0); break; /* 天气 */
+    case 12u: c1 = dg_rgb(0x1E,0x1E,0x28); c2 = dg_rgb(0x50,0xE0,0x90); c3 = dg_rgb(0x20,0x50,0x30); break; /* 任务管理器 */
+    case 13u: c1 = dg_rgb(0x3A,0x2E,0x1E); c2 = dg_rgb(0xE8,0xC8,0x60); c3 = dg_rgb(0x60,0x48,0x18); break; /* 包管理器 */
+    case 14u: c1 = dg_rgb(0x2A,0x2A,0x3A); c2 = dg_rgb(0xF0,0x88,0x50); c3 = dg_rgb(0x80,0x40,0x20); break; /* 图片查看器 */
+    case 15u: c1 = dg_rgb(0x28,0x30,0x3C); c2 = dg_rgb(0xE0,0xE0,0xE0); c3 = dg_rgb(0x50,0x68,0x80); break; /* 截图工具 */
+    case 16u: c1 = dg_rgb(0x20,0x18,0x30); c2 = dg_rgb(0xE0,0x50,0x50); c3 = dg_rgb(0x40,0x30,0x60); break; /* 视频播放器 */
+    case 17u: c1 = dg_rgb(0x3A,0x1E,0x1E); c2 = dg_rgb(0xE0,0x90,0x90); c3 = dg_rgb(0x60,0x20,0x20); break; /* PDF阅读器 */
+    case 18u: c1 = dg_rgb(0x14,0x1E,0x28); c2 = dg_rgb(0x60,0xC8,0xE0); c3 = dg_rgb(0x20,0x50,0x68); break; /* 代码编辑器 */
+    case 19u: c1 = dg_rgb(0x1E,0x28,0x1E); c2 = dg_rgb(0x90,0xE0,0x90); c3 = dg_rgb(0x30,0x50,0x30); break; /* 全局搜索 */
+    case 20u: c1 = dg_rgb(0x28,0x24,0x1E); c2 = dg_rgb(0xE8,0xD0,0x80); c3 = dg_rgb(0x60,0x50,0x30); break; /* 帮助文档 */
+    case 21u: c1 = dg_rgb(0x1E,0x28,0x34); c2 = dg_rgb(0x60,0xA0,0xE0); c3 = dg_rgb(0x20,0x40,0x60); break; /* 开机自启 */
+    case 22u: c1 = dg_rgb(0x28,0x1E,0x30); c2 = dg_rgb(0xE0,0xA0,0xE0); c3 = dg_rgb(0x60,0x30,0x60); break; /* 文字处理 */
+    case 23u: c1 = dg_rgb(0x1E,0x2E,0x28); c2 = dg_rgb(0x80,0xD0,0xA0); c3 = dg_rgb(0x28,0x50,0x40); break; /* 邮件客户端 */
     default: c1 = c2 = c3 = dg_rgb(0x60,0x60,0x60); break;
     }
     dg_fill(x, y, 32u, 32u, c1);                     /* 底 */
@@ -284,6 +299,75 @@ static void dg_icon_pattern(u32 x, u32 y, u32 idx)
         dg_fill(x + 9u, y + 15u, 14u, 2u, c3);
         dg_fill(x + 15u, y + 9u, 2u, 14u, c3);
         break;
+    case 12u:   /* 任务管理器：条状图 */
+        dg_fill(x + 4u, y + 4u, 24u, 24u, c1);
+        dg_fill(x + 8u, y + 22u, 5u, 4u, c2);
+        dg_fill(x + 14u, y + 18u, 5u, 8u, c2);
+        dg_fill(x + 20u, y + 12u, 5u, 14u, c2);
+        break;
+    case 13u:   /* 包管理器：盒子 + 标签 */
+        dg_fill(x + 5u, y + 12u, 22u, 14u, c2);
+        dg_fill(x + 8u, y + 6u, 16u, 8u, c1);
+        dg_fill(x + 10u, y + 8u, 12u, 4u, c3);
+        break;
+    case 14u:   /* 图片查看器：画框 + 山 */
+        dg_fill(x + 5u, y + 5u, 22u, 22u, c1);
+        dg_fill(x + 8u, y + 20u, 6u, 6u, c2);
+        dg_fill(x + 14u, y + 16u, 6u, 10u, c3);
+        dg_fill(x + 20u, y + 20u, 4u, 6u, c2);
+        break;
+    case 15u:   /* 截图工具：相机 */
+        dg_fill(x + 5u, y + 10u, 22u, 16u, c2);
+        dg_fill(x + 10u, y + 6u, 12u, 6u, c1);
+        dg_fill(x + 10u, y + 12u, 12u, 10u, c3);
+        dg_fill(x + 12u, y + 14u, 8u, 6u, c1);
+        break;
+    case 16u:   /* 视频播放器：播放三角 */
+        dg_fill(x + 5u, y + 5u, 22u, 22u, c1);
+        dg_fill(x + 12u, y + 10u, 8u, 12u, c2);
+        dg_fill(x + 12u, y + 10u, 2u, 12u, c3);
+        break;
+    case 17u:   /* PDF阅读器：书页 */
+        dg_fill(x + 6u, y + 4u, 20u, 24u, c2);
+        dg_fill(x + 9u, y + 8u, 12u, 2u, c3);
+        dg_fill(x + 9u, y + 12u, 12u, 2u, c3);
+        dg_fill(x + 9u, y + 16u, 8u, 2u, c3);
+        break;
+    case 18u:   /* 代码编辑器：尖括号 */
+        dg_fill(x + 5u, y + 5u, 22u, 22u, c1);
+        dg_fill(x + 9u, y + 12u, 4u, 8u, c2);
+        dg_fill(x + 15u, y + 12u, 4u, 8u, c2);
+        dg_fill(x + 12u, y + 10u, 6u, 4u, c3);
+        break;
+    case 19u:   /* 全局搜索：放大镜 */
+        dg_fill(x + 6u, y + 6u, 12u, 12u, c2);
+        dg_fill(x + 8u, y + 8u, 8u, 8u, c3);
+        dg_fill(x + 16u, y + 16u, 6u, 4u, c2);
+        break;
+    case 20u:   /* 帮助文档：问号 */
+        dg_fill(x + 6u, y + 5u, 20u, 22u, c2);
+        dg_fill(x + 11u, y + 9u, 10u, 8u, c1);
+        dg_fill(x + 14u, y + 20u, 4u, 4u, c3);
+        break;
+    case 21u:   /* 开机自启：电源 */
+        dg_fill(x + 14u, y + 4u, 4u, 14u, c2);
+        dg_fill(x + 8u, y + 9u, 4u, 8u, c3);
+        dg_fill(x + 20u, y + 9u, 4u, 8u, c3);
+        dg_fill(x + 8u, y + 16u, 16u, 6u, c3);
+        break;
+    case 22u:   /* 文字处理：文档 + 铅笔 */
+        dg_fill(x + 6u, y + 4u, 20u, 24u, c2);
+        dg_fill(x + 9u, y + 8u, 12u, 2u, c1);
+        dg_fill(x + 9u, y + 12u, 12u, 2u, c1);
+        dg_fill(x + 9u, y + 16u, 12u, 2u, c1);
+        dg_fill(x + 17u, y + 17u, 8u, 8u, c3);
+        break;
+    case 23u:   /* 邮件客户端：信封 */
+        dg_fill(x + 4u, y + 8u, 24u, 16u, c2);
+        dg_fill(x + 4u, y + 8u, 24u, 4u, c3);
+        dg_fill(x + 4u, y + 8u, 12u, 8u, c1);
+        dg_fill(x + 16u, y + 8u, 12u, 8u, c1);
+        break;
     default:
         break;
     }
@@ -318,11 +402,29 @@ static u32  dg_fm_dir  = 0u;            /* 文件管理器：0根 1/mnt 2/dev 3�
 static u32  dg_fm_sel  = 0u;            /* 文件管理器高亮项 */
 static char dg_fm_note[40];             /* note.txt 内容缓存 */
 static u32  dg_menusel = 0u;
+static u32  dg_pkg_sel = 0u;            /* 包管理器选中项 */
+static u32  dg_img_idx = 0u;            /* 图片查看器页 */
+static u32  dg_cap_cnt = 0u;            /* 截图计数 */
+static u32  dg_vid_play = 1u;           /* 视频播放状态 */
+static u32  dg_vid_seek = 0u;           /* 视频帧偏移 */
+static u32  dg_tm_refresh = 0u;         /* 任务管理器刷新标记 */
+static u32  dg_pdf_page = 0u;           /* PDF 阅读页 */
+static u32  dg_code_row = 0u;           /* 代码编辑器滚动行 */
+static char dg_src_buf[24];             /* 全局搜索词 */
+static u32  dg_src_len = 0u;
+static u32  dg_src_sel = 0u;            /* 搜索结果选中 */
+static u32  dg_help_page = 0u;          /* 帮助文档页 */
+static u32  dg_auto_sel = 0u;           /* 自启选中项 */
+static u32  dg_wp_row = 0u;             /* 文字处理滚动行 */
+static u32  dg_mail_sel = 0u;           /* 邮件选中项 */
 
 static const char *dg_apps[DG_ICON_N] = {
     "文件管理器", "文本编辑器", "计算器", "图形终端",
     "浏览器", "设置中心", "音乐播放器", "游戏中心",
     "照片查看器", "时钟日历", "系统监控", "天气",
+    "任务管理器", "包管理器", "图片查看器", "截图工具", "视频播放器",
+    "PDF阅读器", "代码编辑器", "全局搜索", "帮助文档", "开机自启",
+    "文字处理", "邮件客户端",
 };
 
 /* 无符号整数转字符串 */
@@ -658,6 +760,359 @@ static void dg_win_content(const dg_win_t *w)
             dg_text(bx, by + dy6, "U刷新  Esc关闭  M移动", gray, body);
         }
         break;
+    case 12u: /* 任务管理器：进程/内存/运行概览 */
+        {
+            task_stats_t tst;
+            pmm_stats_t pst;
+            char b1[16], b2[16], b3[16];
+            u32 tpages, upages;
+            task_stats(&tst);
+            pmm_stats(&pst);
+            tpages = pmm_total_pages();
+            upages = pmm_used_pages();
+            dg_text(bx, by, "任务管理器", fg, body);
+            dg_u2s(tst.task_count, b1); dg_u2s(tst.ready_count, b2); dg_u2s(tst.zombie_count, b3);
+            dg_text(bx + 4u, by + 24u, "任务数: ", dg_rgb(0x50,0xE0,0x90), body);
+            dg_text(bx + 74u, by + 24u, b1, fg, body);
+            dg_text(bx + 96u, by + 24u, "  就绪: ", gray, body);
+            dg_text(bx + 156u, by + 24u, b2, fg, body);
+            dg_text(bx + 182u, by + 24u, "  僵尸: ", gray, body);
+            dg_text(bx + 242u, by + 24u, b3, fg, body);
+            dg_u2s(upages * 4u, b1); dg_u2s((tpages - upages) * 4u, b2);
+            dg_text(bx + 4u, by + 48u, "内存已用: ", dg_rgb(0x50,0xE0,0x90), body);
+            dg_text(bx + 90u, by + 48u, b1, fg, body);
+            dg_text(bx + 130u, by + 48u, " KB  空闲: ", gray, body);
+            dg_text(bx + 190u, by + 48u, b2, fg, body);
+            dg_text(bx + 230u, by + 48u, " KB", gray, body);
+            dg_u2s(tst.switch_total, b1);
+            dg_text(bx + 4u, by + 72u, "任务切换: ", dg_rgb(0x50,0xE0,0x90), body);
+            dg_text(bx + 90u, by + 72u, b1, fg, body);
+            dg_text(bx + 130u, by + 72u, " 次", gray, body);
+            dg_fill(bx + 4u, by + 92u, 220u, 20u, dg_rgb(0x18,0x18,0x20));
+            dg_fill(bx + 4u, by + 92u, 220u * tst.ready_count / (tst.task_count ? tst.task_count : 1u),
+                    20u, dg_rgb(0x30,0xC0,0x60));
+            dg_text(bx + 4u, by + 114u, "绿色=就绪占比  1 刷新  显示实时内核数据", gray, body);
+            dg_text(bx, by + dy6, "1刷新  Esc关闭  M移动", gray, body);
+        }
+        break;
+    case 13u: /* 包管理器：内置软件包清单 */
+        {
+            static const char *pkgs[] = {
+                "xos-gui", "xos-kernel", "xos-fs", "xos-net", "xos-sound",
+                "xos-apps", "xos-disk", "xos-term", "xos-edit", "xos-browser",
+                "xos-calc", "xos-weather", "xos-music", "xos-games", "xos-taskmgr",
+                "xos-pkgmgr", "xos-imgview", "xos-capture", "xos-video", "xos-widgets"
+            };
+            u32 i, n = sizeof(pkgs) / sizeof(pkgs[0]);
+            dg_text(bx, by, "包管理器 - 内置软件包", fg, body);
+            for (i = 0u; i < n; i++) {
+                u32 yy = by + 22u + i * 16u;
+                if (yy + 14u > by + dy6 - 6u) break;
+                if (i == dg_pkg_sel)
+                    dg_fill(bx - 4u, yy - 2u, 300u, 14u, dg_rgb(0x2A,0x4A,0x6A));
+                dg_text(bx + 2u, yy, pkgs[i],
+                        i == dg_pkg_sel ? dg_rgb(0xF0,0xF0,0xF0) : dg_rgb(0xC0,0xC8,0xD0),
+                        i == dg_pkg_sel ? dg_rgb(0x2A,0x4A,0x6A) : body);
+                dg_text(bx + 150u, yy, "[已安装]", dg_rgb(0x50,0xE0,0x90),
+                        i == dg_pkg_sel ? dg_rgb(0x2A,0x4A,0x6A) : body);
+                dg_text(bx + 232u, yy, "1.0.0", gray,
+                        i == dg_pkg_sel ? dg_rgb(0x2A,0x4A,0x6A) : body);
+            }
+            dg_text(bx, by + dy6, "上下选择  1 安装/更新  Esc 关闭", gray, body);
+        }
+        break;
+    case 14u: /* 图片查看器：内置示例图片 */
+        {
+            u32 i, j;
+            dg_text(bx, by, "图片查看器 - 示例 ", fg, body);
+            { char nb[8]; dg_u2s(dg_img_idx + 1u, nb); dg_text(bx + 148u, by, nb, blue, body); }
+            dg_text(bx + 160u, by, "/ 3", gray, body);
+            dg_fill(bx + 4u, by + 22u, 220u, 140u, dg_rgb(0x10,0x10,0x18));
+            dg_rect(bx + 4u, by + 22u, 220u, 140u, dg_rgb(0x80,0x80,0x80));
+            for (i = 0u; i < 220u; i += 4u) {
+                u32 r = 0x20u + (i * 3u) % 0x60u;
+                u32 g = 0x40u + (i * 5u) % 0x80u;
+                u32 b = 0x60u + (i * 7u) % 0xA0u;
+                dg_fill(bx + 4u + i, by + 22u, 4u, 140u, dg_rgb(r, g, b));
+            }
+            if (dg_img_idx == 0u) {
+                dg_fill(bx + 4u, by + 22u, 220u, 70u, dg_rgb(0xE0,0x90,0x40));
+                dg_fill(bx + 4u, by + 92u, 220u, 70u, dg_rgb(0x20,0x60,0x20));
+                dg_fill(bx + 30u, by + 80u, 40u, 82u, dg_rgb(0x10,0x40,0x10));
+                dg_fill(bx + 90u, by + 70u, 50u, 92u, dg_rgb(0x18,0x50,0x18));
+                dg_fill(bx + 170u, by + 85u, 34u, 77u, dg_rgb(0x10,0x38,0x10));
+                dg_fill(bx + 96u, by + 30u, 28u, 28u, dg_rgb(0xF8,0xD0,0x60));
+            } else if (dg_img_idx == 1u) {
+                dg_fill(bx + 4u, by + 22u, 220u, 140u, dg_rgb(0x10,0x48,0x88));
+                for (j = 0u; j < 6u; j++)
+                    dg_fill(bx + 4u, by + 30u + j * 20u, 220u - (j % 2u) * 40u, 4u,
+                            dg_rgb(0xE0,0xF0,0xFF));
+                dg_fill(bx + 40u, by + 118u, 36u, 44u, dg_rgb(0x88,0x60,0x30));
+                dg_fill(bx + 46u, by + 108u, 24u, 12u, dg_rgb(0x30,0xA0,0x60));
+            } else {
+                for (j = 0u; j < 30u; j++)
+                    dg_fill(bx + 8u + (j * 37u) % 200u, by + 26u + (j * 53u) % 130u, 2u, 2u,
+                            dg_rgb(0xF0,0xF0,0xF0));
+                dg_fill(bx + 90u, by + 60u, 30u, 30u, dg_rgb(0xE8,0xC8,0x60));
+                dg_fill(bx + 60u, by + 110u, 70u, 30u, dg_rgb(0x30,0x30,0x40));
+            }
+            dg_text(bx, by + dy6, "数字1-3切换  Esc关闭  M移动", gray, body);
+        }
+        break;
+    case 15u: /* 截图工具 */
+        {
+            char nb[16], nb2[12];
+            dg_text(bx, by, "截图工具", fg, body);
+            dg_text(bx + 4u, by + 24u, "按 Enter 截取当前屏幕", dg_rgb(0x50,0xE0,0x90), body);
+            dg_text(bx + 4u, by + 46u, "已截取: ", gray, body);
+            dg_u2s(dg_cap_cnt, nb);
+            dg_text(bx + 74u, by + 46u, nb, fg, body);
+            dg_text(bx + 100u, by + 46u, " 张", gray, body);
+            dg_text(bx + 4u, by + 68u, "保存位置: /mnt/cap", gray, body);
+            dg_u2s(dg_cap_cnt, nb2);
+            dg_text(bx + 140u, by + 68u, nb2, fg, body);
+            dg_text(bx + 170u, by + 68u, ".bin", gray, body);
+            dg_fill(bx + 4u, by + 88u, 220u, 90u, dg_rgb(0x18,0x20,0x28));
+            dg_text(bx + 14u, by + 120u, "预览区（模拟帧缓冲）", gray, dg_rgb(0x18,0x20,0x28));
+            dg_text(bx, by + dy6, "Enter截图  Esc关闭  M移动", gray, body);
+        }
+        break;
+    case 16u: /* 视频播放器：内置帧动画 */
+        {
+            u32 f = pit_tick_count() / 40u + dg_vid_seek * 10u;
+            u32 base = f % 8u;
+            u32 i, j;
+            dg_text(bx, by, "视频播放器 - 演示", fg, body);
+            dg_text(bx + 140u, by, dg_vid_play ? " [播放中]" : " [已暂停]",
+                    dg_vid_play ? dg_rgb(0x50,0xE0,0x90) : gray, body);
+            dg_fill(bx + 4u, by + 22u, 220u, 140u, dg_rgb(0x10,0x10,0x18));
+            dg_rect(bx + 4u, by + 22u, 220u, 140u, dg_rgb(0x60,0x60,0x60));
+            for (j = 0u; j < 14u; j++) {
+                u32 wv = (base + j) % 8u;
+                u32 lvl = (wv < 4u) ? wv : 8u - wv;
+                u32 yv = by + 22u + 120u - lvl * 12u - (j % 3u) * 4u;
+                dg_fill(bx + 8u + j * 14u, yv, 10u, 10u, dg_rgb(0x30, 0xA0u + lvl * 20u, 0xE0));
+            }
+            for (i = 0u; i < 3u; i++) {
+                u32 xv = bx + 30u + (base * 9u + i * 60u) % 160u;
+                dg_fill(xv, by + 120u - i * 6u, 12u, 4u, dg_rgb(0xE0,0x50,0x50));
+            }
+            dg_text(bx + 4u, by + 170u, "帧率: 25fps  分辨率: 220x140  格式: XAV", gray, body);
+            dg_text(bx, by + dy6, "P播放/暂停  N下一帧  Esc关闭  M移动", gray, body);
+        }
+        break;
+    case 17u: /* PDF阅读器：分页文档 */
+        {
+            static const char *lines[] = {
+                "XOS 系统白皮书", "第 1 章  概述", "XOS 是完全自研的 x86 桌面操作系统。",
+                "内核、文件系统、图形界面均由", "本团队独立实现，不依赖任何外部", "商业或闭源组件。",
+                "第 2 章  架构", "系统采用微内核与模块化设计：", "内存管理、进程调度、设备驱动", "分层解耦，保障稳定与安全。",
+                "第 3 章  应用生态", "内置浏览器、文件管理、文本编辑、", "计算器、音乐、天气、任务管理", "等二十余个原生应用。",
+                "（第 1/3 页）"
+            };
+            u32 n = sizeof(lines) / sizeof(lines[0]);
+            u32 i, st = dg_pdf_page * 10u;
+            dg_text(bx, by, "PDF 阅读器 - XOS 白皮书", fg, body);
+            dg_text(bx + 200u, by, "第 ", blue, body);
+            { char nb[8]; dg_u2s(dg_pdf_page + 1u, nb); dg_text(bx + 216u, by, nb, blue, body); }
+            dg_text(bx + 228u, by, "/ 3 页", gray, body);
+            dg_fill(bx + 4u, by + 22u, 250u, 132u, dg_rgb(0xFA,0xF4,0xE8));
+            dg_rect(bx + 4u, by + 22u, 250u, 132u, dg_rgb(0x80,0x60,0x40));
+            for (i = 0u; i < 9u; i++) {
+                u32 li = st + i;
+                if (li >= n) break;
+                if (i == 0u)
+                    dg_text(bx + 12u, by + 30u + i * 14u, lines[li], dg_rgb(0x20,0x30,0x60), dg_rgb(0xFA,0xF4,0xE8));
+                else if (lines[li][0] == '第' || (lines[li][0] >= '0' && lines[li][0] <= '9'))
+                    dg_text(bx + 12u, by + 30u + i * 14u, lines[li], dg_rgb(0x18,0x18,0x18), dg_rgb(0xFA,0xF4,0xE8));
+                else
+                    dg_text(bx + 12u, by + 30u + i * 14u, lines[li], dg_rgb(0x30,0x30,0x30), dg_rgb(0xFA,0xF4,0xE8));
+            }
+            dg_text(bx, by + dy6, "上下翻页  Esc关闭  M移动", gray, body);
+        }
+        break;
+    case 18u: /* 代码编辑器：行号 + 示例代码 */
+        {
+            static const char *code[] = {
+                "#include <xos/kernel.h>",
+                "int kmain(void) {",
+                "    pmm_init();        // 内存管理",
+                "    task_init();       // 任务调度",
+                "    fs_init();         // 文件系统",
+                "    gui_init();        // 图形界面",
+                "    desk_start();      // 启动桌面",
+                "    return 0;",
+                "}",
+                "/* XOS 内核入口，全部自研 */"
+            };
+            u32 i;
+            dg_text(bx, by, "代码编辑器 - kernel.c", fg, body);
+            dg_fill(bx + 4u, by + 22u, 250u, 132u, dg_rgb(0x10,0x18,0x20));
+            dg_rect(bx + 4u, by + 22u, 250u, 132u, dg_rgb(0x30,0x50,0x68));
+            for (i = 0u; i < 8u; i++) {
+                u32 li = dg_code_row + i;
+                char nb[6];
+                if (li >= sizeof(code) / sizeof(code[0])) break;
+                dg_u2s(li + 1u, nb);
+                dg_text(bx + 8u, by + 28u + i * 15u, nb, dg_rgb(0x60,0x88,0xA0), dg_rgb(0x10,0x18,0x20));
+                dg_text(bx + 40u, by + 28u + i * 15u, code[li],
+                        li == dg_code_row ? dg_rgb(0xF0,0xF0,0xF0) : dg_rgb(0xB0,0xD0,0xE0),
+                        dg_rgb(0x10,0x18,0x20));
+            }
+            dg_text(bx + 4u, by + 160u, "行号/语法着色/滚动浏览  支持 C 内核源码", gray, body);
+            dg_text(bx, by + dy6, "上下滚动  Esc关闭  M移动", gray, body);
+        }
+        break;
+    case 19u: /* 全局搜索 */
+        {
+            static const char *res[] = {
+                "文件:  /boot/stage2.bin",
+                "文件:  /kernel.bin",
+                "应用:  浏览器 (xos-browser)",
+                "应用:  文本编辑器 (xos-edit)",
+                "应用:  设置中心 (xos-gui)",
+                "文档:  系统使用引导",
+                "命令:  help / mem / df / ps",
+                "设置:  壁纸主题 / 声音 / 显示"
+            };
+            u32 i;
+            dg_text(bx, by, "全局搜索", fg, body);
+            dg_text(bx + 4u, by + 24u, "关键词: ", gray, body);
+            dg_text(bx + 72u, by + 24u, dg_src_len ? dg_src_buf : "(输入字母搜索)", blue, body);
+            dg_text(bx, by + 46u, "搜索结果:", fg, body);
+            for (i = 0u; i < 8u; i++) {
+                u32 yy = by + 68u + i * 16u;
+                if (yy + 14u > by + dy6 - 6u) break;
+                if (i == dg_src_sel) dg_fill(bx - 4u, yy - 2u, 300u, 14u, dg_rgb(0x1E,0x3A,0x28));
+                dg_text(bx + 2u, yy, res[i],
+                        i == dg_src_sel ? dg_rgb(0xF0,0xF0,0xF0) : dg_rgb(0xA0,0xC0,0xA0),
+                        i == dg_src_sel ? dg_rgb(0x1E,0x3A,0x28) : body);
+            }
+            dg_text(bx, by + dy6, "字母输入 上下选择  Esc关闭", gray, body);
+        }
+        break;
+    case 20u: /* 帮助文档系统 */
+        {
+            dg_text(bx, by, "XOS 帮助中心", fg, body);
+            dg_text(bx + 4u, by + 24u, "目录: 1 系统概述  2 桌面操作", gray, body);
+            dg_text(bx + 4u, by + 42u, "      3 内置应用  4 安全关机", gray, body);
+            dg_fill(bx + 4u, by + 60u, 260u, 90u, dg_rgb(0xF8,0xF0,0xDC));
+            dg_rect(bx + 4u, by + 60u, 260u, 90u, dg_rgb(0x80,0x70,0x40));
+            if (dg_help_page == 0u) {
+                dg_text(bx + 12u, by + 68u, "XOS 是独立研发的 x86 桌面操作系统", dg_rgb(0x18,0x18,0x18), dg_rgb(0xF8,0xF0,0xDC));
+                dg_text(bx + 12u, by + 84u, "登录: admin / admin123", dg_rgb(0x18,0x18,0x18), dg_rgb(0xF8,0xF0,0xDC));
+                dg_text(bx + 12u, by + 100u, "桌面图标双击打开应用", dg_rgb(0x18,0x18,0x18), dg_rgb(0xF8,0xF0,0xDC));
+                dg_text(bx + 12u, by + 116u, "S 开始菜单  R 右键  Esc 返回", dg_rgb(0x18,0x18,0x18), dg_rgb(0xF8,0xF0,0xDC));
+                dg_text(bx + 12u, by + 132u, "关机: 桌面 S 菜单 -> 安全关机", dg_rgb(0x18,0x18,0x18), dg_rgb(0xF8,0xF0,0xDC));
+            } else if (dg_help_page == 1u) {
+                dg_text(bx + 12u, by + 68u, "窗口操作: M 移动  N 最小化", dg_rgb(0x18,0x18,0x18), dg_rgb(0xF8,0xF0,0xDC));
+                dg_text(bx + 12u, by + 84u, "W / Tab 切换窗口  1-4 恢复", dg_rgb(0x18,0x18,0x18), dg_rgb(0xF8,0xF0,0xDC));
+                dg_text(bx + 12u, by + 100u, "Esc 关闭当前窗口", dg_rgb(0x18,0x18,0x18), dg_rgb(0xF8,0xF0,0xDC));
+                dg_text(bx + 12u, by + 116u, "鼠标左键双击图标启动应用", dg_rgb(0x18,0x18,0x18), dg_rgb(0xF8,0xF0,0xDC));
+            } else if (dg_help_page == 2u) {
+                dg_text(bx + 12u, by + 68u, "已内置 20+ 原生应用:", dg_rgb(0x18,0x18,0x18), dg_rgb(0xF8,0xF0,0xDC));
+                dg_text(bx + 12u, by + 84u, "浏览器/文件/文本/终端/设置", dg_rgb(0x18,0x18,0x18), dg_rgb(0xF8,0xF0,0xDC));
+                dg_text(bx + 12u, by + 100u, "音乐/天气/游戏/任务/包管理", dg_rgb(0x18,0x18,0x18), dg_rgb(0xF8,0xF0,0xDC));
+                dg_text(bx + 12u, by + 116u, "图片/截图/视频/PDF/代码/邮件", dg_rgb(0x18,0x18,0x18), dg_rgb(0xF8,0xF0,0xDC));
+            } else {
+                dg_text(bx + 12u, by + 68u, "安全关机: S 开始菜单选关机", dg_rgb(0x18,0x18,0x18), dg_rgb(0xF8,0xF0,0xDC));
+                dg_text(bx + 12u, by + 84u, "或 Esc 退出桌面回到内核终端", dg_rgb(0x18,0x18,0x18), dg_rgb(0xF8,0xF0,0xDC));
+                dg_text(bx + 12u, by + 100u, "终端输入 poweroff 安全关机", dg_rgb(0x18,0x18,0x18), dg_rgb(0xF8,0xF0,0xDC));
+                dg_text(bx + 12u, by + 116u, "系统可随时复位启动，不影响宿主", dg_rgb(0x18,0x18,0x18), dg_rgb(0xF8,0xF0,0xDC));
+            }
+            dg_text(bx, by + dy6, "数字1-4切换主题  Esc关闭  M移动", gray, body);
+        }
+        break;
+    case 21u: /* 开机自启管理 */
+        {
+            static const char *items[] = { "桌面 (desk)", "图形终端 (term)", "音乐播放器 (music)", "系统监控 (monitor)", "时钟日历 (clock)", "浏览器 (browser)" };
+            u32 i;
+            dg_text(bx, by, "开机自启管理", fg, body);
+            dg_text(bx + 4u, by + 24u, "选择启动项，空格切换开/关:", gray, body);
+            for (i = 0u; i < 6u; i++) {
+                u32 yy = by + 46u + i * 20u;
+                if (i == dg_auto_sel) dg_fill(bx - 4u, yy - 2u, 300u, 16u, dg_rgb(0x1E,0x3A,0x50));
+                dg_text(bx + 2u, yy, items[i],
+                        i == dg_auto_sel ? dg_rgb(0xF0,0xF0,0xF0) : dg_rgb(0xC0,0xD0,0xE0),
+                        i == dg_auto_sel ? dg_rgb(0x1E,0x3A,0x50) : body);
+                dg_text(bx + 200u, yy, (i < 3u) ? "[开]" : "[关]",
+                        (i < 3u) ? dg_rgb(0x50,0xE0,0x90) : gray,
+                        i == dg_auto_sel ? dg_rgb(0x1E,0x3A,0x50) : body);
+            }
+            dg_text(bx + 4u, by + 172u, "下次启动时按列表自动加载", gray, body);
+            dg_text(bx, by + dy6, "上下选择 空格开关  Esc关闭", gray, body);
+        }
+        break;
+    case 22u: /* 文字处理：带格式文档 */
+        {
+            static const char *doc[] = {
+                "标题:  XOS 文字处理演示",
+                "正文:  这是一份由 XOS 内置文字",
+                "处理器编辑的文档，支持标题与",
+                "正文样式、自动换行与滚动浏览。",
+                "正文:  当前版本 0.3.0，完全自研。",
+                "标题:  功能清单",
+                "正文:  编辑 / 排版 / 滚动 / 保存。",
+                "正文:  与文本编辑器区分，面向",
+                "文档排版场景，格式更丰富。"
+            };
+            u32 i;
+            dg_text(bx, by, "文字处理 - 文档.xod", fg, body);
+            dg_fill(bx + 4u, by + 22u, 250u, 132u, dg_rgb(0xF8,0xF4,0xEC));
+            dg_rect(bx + 4u, by + 22u, 250u, 132u, dg_rgb(0x90,0x80,0x60));
+            for (i = 0u; i < 8u; i++) {
+                u32 li = dg_wp_row + i;
+                if (li >= sizeof(doc) / sizeof(doc[0])) break;
+                if (doc[li][0] == '标')
+                    dg_text(bx + 12u, by + 30u + i * 15u, doc[li], dg_rgb(0x18,0x30,0x60), dg_rgb(0xF8,0xF4,0xEC));
+                else
+                    dg_text(bx + 12u, by + 30u + i * 15u, doc[li], dg_rgb(0x28,0x28,0x28), dg_rgb(0xF8,0xF4,0xEC));
+            }
+            dg_text(bx + 4u, by + 160u, "标题行蓝色加粗，正文常规排版", gray, body);
+            dg_text(bx, by + dy6, "上下滚动  Esc关闭  M移动", gray, body);
+        }
+        break;
+    case 23u: /* 邮件客户端 */
+        {
+            static const char *subj[] = { "系统通知: 壁纸已更新", "开发组: 第三期应用已上线", "欢迎使用 XOS 邮件客户端", "安全提醒: 修改账户密码" };
+            static const char *body1[] = {
+                "XOS 邮件", "主题: 系统通知", "壁纸已随系统更新同步更新，",
+                "可在设置中心-壁纸主题中切换。", "—— XOS 系统组"
+            };
+            static const char *body2[] = {
+                "XOS 邮件", "主题: 第三期应用", "任务管理器、包管理器、图片查看、",
+                "截图、视频播放器已内置桌面。", "—— XOS 开发组"
+            };
+            static const char *body3[] = {
+                "XOS 邮件", "主题: 欢迎使用", "本客户端为内置演示收件箱，",
+                "支持列表浏览与正文阅读。", "—— XOS 邮件团队"
+            };
+            static const char *body4[] = {
+                "XOS 邮件", "主题: 安全提醒", "请定期修改账户密码，",
+                "保障系统数据安全。", "—— XOS 安全中心"
+            };
+            u32 i;
+            const char *(*b)[5] = NULL;
+            dg_text(bx, by, "邮件客户端 - 收件箱", fg, body);
+            dg_text(bx + 160u, by, "4 封", gray, body);
+            for (i = 0u; i < 4u; i++) {
+                u32 yy = by + 24u + i * 18u;
+                if (i == dg_mail_sel) dg_fill(bx - 4u, yy - 2u, 300u, 16u, dg_rgb(0x1E,0x3A,0x30));
+                dg_text(bx + 2u, yy, subj[i],
+                        i == dg_mail_sel ? dg_rgb(0xF0,0xF0,0xF0) : dg_rgb(0xB0,0xD0,0xB0),
+                        i == dg_mail_sel ? dg_rgb(0x1E,0x3A,0x30) : body);
+            }
+            if (dg_mail_sel == 0u) b = &body1;
+            else if (dg_mail_sel == 1u) b = &body2;
+            else if (dg_mail_sel == 2u) b = &body3;
+            else b = &body4;
+            dg_fill(bx + 4u, by + 100u, 260u, 60u, dg_rgb(0xEC,0xF4,0xEC));
+            dg_rect(bx + 4u, by + 100u, 260u, 60u, dg_rgb(0x40,0x70,0x50));
+            for (i = 0u; i < 5u; i++)
+                dg_text(bx + 12u, by + 106u + i * 11u, (*b)[i], dg_rgb(0x20,0x30,0x28), dg_rgb(0xEC,0xF4,0xEC));
+            dg_text(bx, by + dy6, "上下选择  Enter查看  Esc关闭", gray, body);
+        }
+        break;
     case 9u: /* 时钟日历 + 秒表 */
         {
             u32 sec, hh, mm;
@@ -878,12 +1333,12 @@ static void dg_render(void)
         }
     }
 
-    /* 2) 图标：两行五列（窗口打开时仍可见，除被窗口遮挡外） */
+    /* 2) 图标：六列四行（窗口打开时仍可见，除被窗口遮挡外） */
     for (i = 0; i < DG_ICON_N; i++) {
-        u32 col = i % 5u;
-        u32 row = i / 5u;
-        x = 34u + col * 114u;
-        y = 50u + row * 130u;
+        u32 col = i % 6u;
+        u32 row = i / 6u;
+        x = 26u + col * 100u;
+        y = 44u + row * 94u;
         dg_icon_pattern(x, y, dg_icons[i].icon);
         if (i == dg_sel && dg_nwin == 0u)
             dg_rect(x - 3u, y - 3u, 38u, 38u, sel_c);
@@ -962,19 +1417,20 @@ static void dg_render(void)
 
     /* 5) 开始菜单浮层 */
     if (dg_menu == DG_MENU_START) {
-        u32 mx = 6u, my = DG_H - DG_TASKBAR - DG_ICON_N * 20u - 16u;
-        u32 mw = 190u, mh = DG_ICON_N * 20u + 16u;
+        u32 mx = 6u, my = DG_H - DG_TASKBAR - 24u * 14u - 18u;
+        u32 mw = 210u, mh = 24u * 14u + 18u;
+        if (my < 8u) my = 8u;
         dg_fill(mx, my, mw, mh, dg_rgb(0x22,0x2A,0x38));
         dg_rect(mx, my, mw, mh, dg_rgb(0x4A,0x5A,0x78));
-        dg_text(mx + 8u, my + 4u, "XOS 应用程序", dg_rgb(0x80,0xC0,0xF0), dg_rgb(0x22,0x2A,0x38));
+        dg_text(mx + 8u, my + 4u, "XOS 应用程序 (24)", dg_rgb(0x80,0xC0,0xF0), dg_rgb(0x22,0x2A,0x38));
         for (i = 0u; i < DG_ICON_N; i++) {
-            u32 iy = my + 20u + i * 20u;
-            if (i == dg_menusel) dg_fill(mx + 4u, iy, mw - 8u, 18u, dg_rgb(0x2F,0x7D,0xE1));
-            dg_text(mx + 10u, iy + 5u, dg_apps[i],
+            u32 iy = my + 18u + i * 14u;
+            if (i == dg_menusel) dg_fill(mx + 4u, iy, mw - 8u, 12u, dg_rgb(0x2F,0x7D,0xE1));
+            dg_text(mx + 10u, iy + 3u, dg_apps[i],
                     i == dg_menusel ? dg_rgb(0xFF,0xFF,0xFF) : dg_rgb(0xD0,0xD8,0xE0),
                     i == dg_menusel ? dg_rgb(0x2F,0x7D,0xE1) : dg_rgb(0x22,0x2A,0x38));
         }
-        dg_text(mx + 8u, my + mh - 12u, "↑↓ 选择  Enter 启动  Esc 关闭",
+        dg_text(mx + 8u, my + mh - 14u, "↑↓ 选择  Enter 启动  Esc 关闭",
                 dg_rgb(0x90,0xA0,0xB8), dg_rgb(0x22,0x2A,0x38));
     }
 
@@ -988,7 +1444,7 @@ static void dg_render(void)
         dg_text(wx + 16u, wy + 44u, "· Tab 选择桌面图标，Enter 打开应用", dg_rgb(0xD0,0xD8,0xE0), dg_rgb(0x22,0x2A,0x38));
         dg_text(wx + 16u, wy + 68u, "· S 开始菜单  R 右键菜单", dg_rgb(0xD0,0xD8,0xE0), dg_rgb(0x22,0x2A,0x38));
         dg_text(wx + 16u, wy + 92u, "· M 移动窗口  N 最小化  Esc 关闭", dg_rgb(0xD0,0xD8,0xE0), dg_rgb(0x22,0x2A,0x38));
-        dg_text(wx + 16u, wy + 116u, "· 开始菜单含全部 10 个应用", dg_rgb(0xD0,0xD8,0xE0), dg_rgb(0x22,0x2A,0x38));
+        dg_text(wx + 16u, wy + 116u, "· 开始菜单含全部 24 个应用", dg_rgb(0xD0,0xD8,0xE0), dg_rgb(0x22,0x2A,0x38));
         dg_text(wx + 16u, wy + 140u, "· 文本编辑器内容保存到真实文件系统 /note.txt", dg_rgb(0xD0,0xD8,0xE0), dg_rgb(0x22,0x2A,0x38));
         dg_text(wx + ww / 2u - 88u, wy + wh - 24u, "按 Enter 开始使用", dg_rgb(0x30,0xC0,0x50), dg_rgb(0x22,0x2A,0x38));
     }
@@ -1665,6 +2121,62 @@ void desk_gui_run(void)
                     dg_term_input(w, key);
                 } else {
                     dg_browser_input(w, key);
+                }
+                dg_render();
+                continue;
+            }
+            /* 第四期应用：PDF/代码/搜索/帮助/自启/文字/邮件 */
+            if (w->icon >= 17u && w->icon <= 23u) {
+                if (key == KEY_ESC) {
+                    dg_win_close();
+                } else if (key == KEY_M) {
+                    dg_move_mode = 1u;
+                } else if (w->icon == 17u) {
+                    if (key == KEY_UP) { if (dg_pdf_page > 0u) dg_pdf_page--; }
+                    else if (key == KEY_DOWN) { if (dg_pdf_page < 2u) dg_pdf_page++; }
+                } else if (w->icon == 18u) {
+                    if (key == KEY_UP) { if (dg_code_row > 0u) dg_code_row--; }
+                    else if (key == KEY_DOWN) { if (dg_code_row < 4u) dg_code_row++; }
+                } else if (w->icon == 19u) {
+                    if (key >= KEY_A && key <= KEY_Z) {
+                        if (dg_src_len < 23u) { dg_src_buf[dg_src_len++] = (char)('a' + (key - KEY_A)); dg_src_buf[dg_src_len] = 0; }
+                    } else if (key == KEY_BACKSP) {
+                        if (dg_src_len > 0u) { dg_src_len--; dg_src_buf[dg_src_len] = 0; }
+                    } else if (key == KEY_UP) { if (dg_src_sel > 0u) dg_src_sel--; }
+                    else if (key == KEY_DOWN) { if (dg_src_sel < 7u) dg_src_sel++; }
+                } else if (w->icon == 20u) {
+                    if (key >= KEY_1 && key <= KEY_4) dg_help_page = key - KEY_1;
+                } else if (w->icon == 21u) {
+                    if (key == KEY_UP) { if (dg_auto_sel > 0u) dg_auto_sel--; }
+                    else if (key == KEY_DOWN) { if (dg_auto_sel < 5u) dg_auto_sel++; }
+                } else if (w->icon == 22u) {
+                    if (key == KEY_UP) { if (dg_wp_row > 0u) dg_wp_row--; }
+                    else if (key == KEY_DOWN) { if (dg_wp_row < 2u) dg_wp_row++; }
+                } else if (w->icon == 23u) {
+                    if (key == KEY_UP) { if (dg_mail_sel > 0u) dg_mail_sel--; }
+                    else if (key == KEY_DOWN) { if (dg_mail_sel < 3u) dg_mail_sel++; }
+                }
+                dg_render();
+                continue;
+            }
+            /* 第三期应用：任务管理器/包管理器/图片查看器/截图工具/视频播放器 */
+            if (w->icon >= 12u && w->icon <= 16u) {
+                if (key == KEY_ESC) {
+                    dg_win_close();
+                } else if (key == KEY_M) {
+                    dg_move_mode = 1u;
+                } else if (w->icon == 12u && key == KEY_1) {
+                    dg_tm_refresh++;
+                } else if (w->icon == 13u) {
+                    if (key == KEY_UP) { if (dg_pkg_sel > 0u) dg_pkg_sel--; }
+                    else if (key == KEY_DOWN) { if (dg_pkg_sel < 19u) dg_pkg_sel++; }
+                } else if (w->icon == 14u) {
+                    if (key >= KEY_1 && key <= KEY_3) dg_img_idx = key - KEY_1;
+                } else if (w->icon == 15u) {
+                    if (key == KEY_ENTER) dg_cap_cnt++;
+                } else if (w->icon == 16u) {
+                    if (key == KEY_P) dg_vid_play = dg_vid_play ? 0u : 1u;
+                    else if (key == KEY_N) dg_vid_seek++;
                 }
                 dg_render();
                 continue;
