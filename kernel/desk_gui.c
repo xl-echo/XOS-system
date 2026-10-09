@@ -740,6 +740,21 @@ static void dg_win_content(const dg_win_t *w)
     }
 }
 
+/* 取 UTF-8 名称前 2 个字符（中文 3 字节/字）用于任务栏按钮 */
+static void dg_name2(char *dst, const char *name)
+{
+    u32 n = 0u, c = 0u;
+    while (name[n] && c < 2u) {
+        if ((name[n] & 0x80u) == 0u) { dst[n] = name[n]; n++; c++; }
+        else {
+            u32 k;
+            for (k = 0u; k < 3u && name[n + k]; k++) dst[n + k] = name[n + k];
+            n += 3u; c++;
+        }
+    }
+    dst[n] = 0;
+}
+
 static u32 dg_win_accent(u32 icon)
 {
     switch (icon) {
@@ -833,6 +848,8 @@ static void dg_render(void)
             dg_window_draw(&dg_wins[i]);
     }
 
+    /* 3.5) 桌面顶部数字直达提示 */
+    dg_text(8u, 6u, "数字 1-9 直达应用  0 时钟  Tab 选择  Enter 打开", dg_rgb(0xA0,0xB8,0xD0), dg_rgb(0x10,0x18,0x28));
     /* 4) 任务栏 */
     dg_fill(0u, DG_H - DG_TASKBAR, DG_W, DG_TASKBAR, bar);
     dg_fill(0u, DG_H - DG_TASKBAR, DG_W, 2u, dg_rgb(0x2E,0x3A,0x4E));
@@ -841,19 +858,19 @@ static void dg_render(void)
     dg_text(14u, DG_H - DG_TASKBAR + 11u, "XOS", dg_rgb(0xFF,0xFF,0xFF), dg_rgb(0x2F,0x7D,0xE1));
     /* 状态提示 */
     dg_text(90u, DG_H - DG_TASKBAR + 11u,
-            "Tab 选择  S 开始  R 菜单  Enter 打开", dg_rgb(0xA0,0xB0,0xC8), bar);
+            "Tab选择  S开始  R菜单", dg_rgb(0xA0,0xB0,0xC8), bar);
     /* 最小化窗口的恢复按钮（点击概念：按对应数字键恢复） */
     if (dg_nwin > 0u) {
         u32 rbx = 300u;
         for (i = 0u; i < DG_WIN_MAX; i++) {
             if (dg_wins[i].open) {
-                dg_fill(rbx, DG_H - DG_TASKBAR + 6u, 34u, 18u,
-                        dg_wins[i].min ? dg_rgb(0x2A,0x4A,0x6A) : dg_rgb(0x2E,0x3E,0x52));
-                tbuf[0] = (char)('1' + i);
-                tbuf[1] = 0;
-                dg_text(rbx + 13u, DG_H - DG_TASKBAR + 12u, tbuf,
-                        dg_wins[i].min ? dg_rgb(0x80,0xC0,0xF0) : dg_rgb(0xE0,0xE0,0xE0), bar);
-                rbx += 40u;
+                u32 col = dg_wins[i].min ? dg_rgb(0x2A,0x4A,0x6A)
+                        : (i == dg_focus) ? dg_rgb(0x2F,0x7D,0xE1) : dg_rgb(0x2E,0x3E,0x52);
+                dg_fill(rbx, DG_H - DG_TASKBAR + 6u, 40u, 18u, col);
+                dg_name2(tbuf, dg_icons[dg_wins[i].icon].name);
+                dg_text(rbx + 6u, DG_H - DG_TASKBAR + 12u, tbuf,
+                        dg_rgb(0xE8,0xE8,0xE8), bar);
+                rbx += 46u;
             }
         }
     }
@@ -1641,6 +1658,10 @@ void desk_gui_run(void)
             dg_sel = (dg_sel + DG_ICON_N - 1u) % DG_ICON_N;
         } else if (key == KEY_ENTER) {
             dg_win_open(dg_sel);
+        } else if (key >= KEY_1 && key <= KEY_9) {
+            dg_win_open(key - KEY_1);                    /* 1-9 → 图标0-8 */
+        } else if (key == KEY_0) {
+            dg_win_open(9u);                             /* 0 → 时钟 */
         } else if (key == KEY_S) {
             dg_menu = DG_MENU_START;
             dg_menusel = 0u;
