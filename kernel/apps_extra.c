@@ -149,7 +149,7 @@ void cmd_touch(u32 argc, char (*argv)[SH_MAX_CMD])
     int fd;
     if (argc < 2) { con_puts("usage: touch <file>\n"); return; }
     fd = fs_open(argv[1], O_WRITE | O_CREAT);
-    if (fd < 0) { con_puts("touch: failed\n"); return; }
+    if (fd < 0) { con_puts("touch: failed rc="); con_put_dec((u32)(-fd)); con_puts("\n"); return; }
     fs_close(fd);
     con_puts("touch: ok\n");
 }

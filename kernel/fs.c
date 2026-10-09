@@ -18,6 +18,9 @@ static fs_type_t   fstypes[FS_TYPE_MAX];
 static fs_file_t   ftable[FS_OPEN_MAX];
 
 static u32 ino_seq = 1u;
+
+/* 根 inode 访问器（供磁盘文件系统挂载 /disk 用） */
+fs_inode_t *fs_get_root(void) { return &root_inode; }
 static u32 stat_open, stat_read, stat_write, stat_mkdir, stat_unlink;
 static u32 fs_errors;
 

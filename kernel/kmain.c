@@ -50,6 +50,7 @@
 #include "dbg.h"      /* 第 31 册：调试与监控 */
 #include "crash.h"     /* 崩溃转储：panic 现场持久化 + 启动恢复报告 */
 #include "rtc.h"       /* 实时时钟：CMOS RTC 真实读取 + date 命令 */
+#include "xffs.h"      /* 磁盘文件系统：/disk 挂载，重启保留用户数据 */
 #include "inst.h"     /* 第 32 册：安装程序-包管理 */
 #include "virt.h"     /* 第 33 册：虚拟化支持 */
 #include "shell_interactive.h" /* 交互式终端 Shell（自检通过后接管控制台） */
@@ -728,6 +729,16 @@ void kmain(void)
     stage_pause();
 
     /* =====================================================================
+     * 阶段 13.9：存储子系统（磁盘是 XFFS 持久化的底层，必须先行初始化）
+     * ================================================================== */
+    section("[13.9/15] Initializing storage subsystem...\n");
+    disk_init();
+    report("ATA PIO / IDENTIFY / LBA28 / AHCI probe / NVMe regs / SCSI CDB / bio / sched / MBR-GPT / cache / writeback / TRIM / hotplug / retry / badblock / SMART / encryption / RAID / LVM / quota / stat / power",
+           "Storage subsystem self-test (21 groups)", disk_selftest());
+    disk_dump();
+    stage_pause();
+
+    /* =====================================================================
      * 阶段 14：文件系统核心
      * VFS 抽象 + tmpfs/devfs 注册 + 挂载点表 + 路径解析 + 打开文件表 +
      * 读写路径 + 权限 + 一致性检查（自检 51 用例）。
@@ -737,6 +748,12 @@ void kmain(void)
     report("vfs / superblock / inode / dentry / fd table / path resolve / rw / perm",
            "Filesystem core self-test", fs_selftest());
     fs_dump();
+    stage_pause();
+
+    section("[14.2/15] Initializing disk filesystem XFFS (/disk)...\n");
+    xffs_init();
+    report("layout / slots / persistence / safety",
+           "XFFS disk filesystem self-test", xffs_selftest());    xffs_dump();
     stage_pause();
 
     /* =====================================================================
@@ -822,13 +839,6 @@ void kmain(void)
     report("PS/2 mouse protocol / packet parse 3-4-5 / delta accumulate / button tracking / wheel / accel-smooth / cursor clip / USB HID / hotplug / config",
            "Mouse subsystem self-test (20 groups)", mse_selftest());
     mse_dump();
-    stage_pause();
-
-    section("[18/19] Initializing storage subsystem...\n");
-    disk_init();
-    report("ATA PIO / IDENTIFY / LBA28 / AHCI probe / NVMe regs / SCSI CDB / bio / sched / MBR-GPT / cache / writeback / TRIM / hotplug / retry / badblock / SMART / encryption / RAID / LVM / quota / stat / power",
-           "Storage subsystem self-test (21 groups)", disk_selftest());
-    disk_dump();
     stage_pause();
 
     section("[19/19] Initializing display subsystem...\n");

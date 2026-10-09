@@ -15,7 +15,7 @@
 #define ATA_REG_LBA_HI(p)    ((p) ? 0x175u : 0x1F5u)
 #define ATA_REG_DEVICE(p)    ((p) ? 0x176u : 0x1F6u)
 #define ATA_REG_CMD(p)       ((p) ? 0x177u : 0x1F7u)
-#define ATA_REG_STATUS(p)    ((p) ? 0x377u : 0x3F6u)
+#define ATA_REG_STATUS(p)    ((p) ? 0x177u : 0x1F7u)
 
 #define ATA_CMD_READ_PIO     0x20u
 #define ATA_CMD_WRITE_PIO    0x30u

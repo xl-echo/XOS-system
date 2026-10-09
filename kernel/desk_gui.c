@@ -924,7 +924,7 @@ static void dg_win_content(const dg_win_t *w)
                 if (li >= n) break;
                 if (i == 0u)
                     dg_text(bx + 12u, by + 30u + i * 14u, lines[li], dg_rgb(0x20,0x30,0x60), dg_rgb(0xFA,0xF4,0xE8));
-                else if (lines[li][0] == '第' || (lines[li][0] >= '0' && lines[li][0] <= '9'))
+                else if ((u8)lines[li][0] == 0xE7 || (lines[li][0] >= '0' && lines[li][0] <= '9'))
                     dg_text(bx + 12u, by + 30u + i * 14u, lines[li], dg_rgb(0x18,0x18,0x18), dg_rgb(0xFA,0xF4,0xE8));
                 else
                     dg_text(bx + 12u, by + 30u + i * 14u, lines[li], dg_rgb(0x30,0x30,0x30), dg_rgb(0xFA,0xF4,0xE8));

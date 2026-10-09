@@ -157,6 +157,7 @@ void devfs_dump(void);
 void   fs_init(void);
 int    fs_register_type(const char *fstype, fs_ops_t *ops);
 int    fs_mount(const char *fstype, const char *path, int readonly);
+fs_inode_t *fs_get_root(void);
 int    fs_mkdir(const char *path);
 int    fs_unlink(const char *path);
 int    fs_open(const char *path, u32 flags);

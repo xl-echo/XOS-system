@@ -18,6 +18,7 @@
 #include "../include/xos_hello_bin.h"
 #include "../include/crash.h"
 #include "../include/dbg.h"
+#include "../include/xffs.h"
 
 /* ---------------- 端口 IO（8042 软复位用） ---------------- */
 static inline void x_outb(u16 port, u8 val)
@@ -264,6 +265,7 @@ static void cmd_reboot(u32 argc, char (*argv)[SH_MAX_CMD])
     con_puts("Persisting kernel log...\n");
     con_flush();
     dbg_log_persist();               /* 关机前把日志缓冲落盘（磁盘末尾区） */
+    xffs_flush_all();                /* 关机前全量落盘 /disk 用户数据 */
     con_puts("Rebooting...\n");
     con_flush();
     x_outb(0x64, 0xFE);          /* 8042 软复位（标准、安全） */
@@ -275,6 +277,7 @@ static void cmd_poweroff(u32 argc, char (*argv)[SH_MAX_CMD])
     con_puts("Persisting kernel log...\n");
     con_flush();
     dbg_log_persist();               /* 关机前把日志缓冲落盘（磁盘末尾区） */
+    xffs_flush_all();                /* 关机前全量落盘 /disk 用户数据 */
     con_puts("Powering off...\n");
     con_flush();
     pm_shutdown();
