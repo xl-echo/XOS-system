@@ -24,17 +24,17 @@ D:\��ϵͳ���������ĵ�\��Ŀ����\xos\kernel\lo
       |         ^~
 D:\��ϵͳ��������
   [warn] D:\��ϵͳ���������ĵ�\��Ŀ����\xos\kernel\desk_gui.c: In function 'dg_win_content':
-D:\��ϵͳ���������ĵ�\��Ŀ����\xos\kernel\desk_gui.c:372:20: warning: variable 'pmem' set but not used [-Wunused-but-set-variable]
-  372 |             u32 i, pmem, pproc;
+D:\��ϵͳ���������ĵ�\��Ŀ����\xos\kernel\desk_gui.c:389:20: warning: variable 'pmem' set but not used [-Wunused-but-set-variable]
+  389 |             u32 i, pmem, pproc;
       |                    ^~~~
-D:\��ϵͳ���������ĵ�\��Ŀ����\xos\kernel\desk_gui.c:372:17: warning: unused variable 'i' [-Wunused-variable]
-  372 |             u32 i, pmem, pproc;
+D:\��ϵͳ���������ĵ�\��Ŀ����\xos\kernel\desk_gui.c:389:17: warning: unused variable 'i' [-Wunused-variable]
+  389 |             u32 i, pmem, pproc;
       |                 ^
 D:\��ϵͳ���������ĵ�\��Ŀ����\xos\kernel\desk_gui.c: In function 'dg_browser_input':
-D:\��ϵͳ���������ĵ�\��Ŀ����\xos\kernel\desk_gui.c:857:13: warning: u
-  kernel.bin  : 382652 B  (上限 524288 B)
+D:\��ϵͳ���������ĵ�\��Ŀ����\xos\kernel\desk_gui.c:932:13: warning: u
+  kernel.bin  : 386748 B  (上限 524288 B)
   size        : text	   data	    bss	    dec	    hex	filename
-  size        :  380512	    572	 236416	 617500	  96c1c	D:\��ϵͳ���������ĵ�\��Ŀ����\xos\build\kernel.pe
+  size        :  383140	    572	 236416	 620128	  97660	D:\��ϵͳ���������ĵ�\��Ŀ����\xos\build\kernel.pe
 [3.5/4] 同步 Stage2 KERNEL_SECS（内核扩容自动更新引导加载扇区数）
 [4/4] 生成磁盘镜像
   kernel 主副本: LBA 33..1056

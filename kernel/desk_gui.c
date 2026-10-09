@@ -33,6 +33,8 @@ static i32  dg_gm_px = 2, dg_gm_py = 2;
 static i32  dg_gm_fx = 4, dg_gm_fy = 3;
 static u32  dg_gm_score = 0u;
 static u32  dg_gm_seed = 1u;
+/* 照片查看器：当前图片索引 0-2 */
+static u32  dg_ph_idx = 0u;
 
 static u32 dg_rand(void)
 {
@@ -163,6 +165,7 @@ typedef struct {
 static const dg_icon_t dg_icons[DG_ICON_N] = {
     { "文件", 0u }, { "文本", 1u }, { "计算器", 2u }, { "终端", 3u },
     { "浏览器", 4u }, { "设置", 5u }, { "音乐", 6u }, { "游戏", 7u },
+    { "照片", 8u }, { "时钟", 9u },
 };
 
 /* 图标图案：32x32 方块，用几何色块组合（像素风，全自研） */
@@ -178,6 +181,8 @@ static void dg_icon_pattern(u32 x, u32 y, u32 idx)
     case 5u: c1 = dg_rgb(0x50,0x5A,0x66); c2 = dg_rgb(0xE8,0xE8,0xE8); c3 = dg_rgb(0x2A,0x2E,0x34); break; /* 设置 */
     case 6u: c1 = dg_rgb(0x1A,0x1A,0x22); c2 = dg_rgb(0x50,0xC8,0x70); c3 = dg_rgb(0x90,0xE0,0xA8); break; /* 音乐 */
     case 7u: c1 = dg_rgb(0x30,0x34,0x3C); c2 = dg_rgb(0xE0,0x48,0x48); c3 = dg_rgb(0x48,0xB8,0xE0); break; /* 游戏 */
+    case 8u: c1 = dg_rgb(0xE8,0xA0,0x40); c2 = dg_rgb(0xF8,0xE0,0xB0); c3 = dg_rgb(0xA0,0x60,0x20); break; /* 照片 */
+    case 9u: c1 = dg_rgb(0x28,0x3A,0x50); c2 = dg_rgb(0xE8,0xE8,0xE8); c3 = dg_rgb(0x58,0x88,0xC0); break; /* 时钟 */
     default: c1 = c2 = c3 = dg_rgb(0x60,0x60,0x60); break;
     }
     dg_fill(x, y, 32u, 32u, c1);                     /* 底 */
@@ -232,6 +237,17 @@ static void dg_icon_pattern(u32 x, u32 y, u32 idx)
         dg_fill(x + 4u, y + 14u, 4u, 4u, c2);
         dg_fill(x + 24u, y + 14u, 4u, 4u, c2);
         break;
+    case 8u:   /* 照片：相框 + 太阳 */
+        dg_fill(x + 6u, y + 6u, 20u, 20u, c2);
+        dg_fill(x + 12u, y + 10u, 8u, 8u, c1);
+        dg_fill(x + 6u, y + 22u, 20u, 4u, c3);
+        dg_char(x + 10u, y + 12u, '1', c3, c2);
+        break;
+    case 9u:   /* 时钟：圆盘 + 指针 */
+        dg_fill(x + 8u, y + 8u, 16u, 16u, c2);
+        dg_fill(x + 15u, y + 8u, 2u, 16u, c3);
+        dg_fill(x + 8u, y + 15u, 16u, 2u, c3);
+        break;
     default:
         break;
     }
@@ -264,6 +280,7 @@ static u32  dg_menusel = 0u;
 static const char *dg_apps[DG_ICON_N] = {
     "文件管理器", "文本编辑器", "计算器", "图形终端",
     "浏览器", "设置中心", "音乐播放器", "游戏中心",
+    "照片查看器", "时钟日历",
 };
 
 /* 窗口内容（按图标不同） */
@@ -419,6 +436,61 @@ static void dg_win_content(const dg_win_t *w)
             dg_text(bx, by + 110u, "P 播放/暂停  N 下一曲  M 移动  Esc 关闭", gray, body);
             break;
         }
+    case 8u: /* 照片查看器：内置像素画 1/2/3 切换 */
+        {
+            u32 pw = w->w - 40u, ph = 110u;
+            u32 px = bx + 12u, py = by + 30u;
+            u32 sky, sun, hill, ground;
+            if (dg_ph_idx == 0u) {        /* 图1 日出风景 */
+                sky = dg_rgb(0x1E,0x3A,0x6A); sun = dg_rgb(0xF0,0xC0,0x40);
+                hill = dg_rgb(0x2A,0x38,0x58); ground = dg_rgb(0x14,0x2A,0x1E);
+            } else if (dg_ph_idx == 1u) { /* 图2 星空 */
+                sky = dg_rgb(0x08,0x10,0x2A); sun = dg_rgb(0xE8,0xE8,0xE0);
+                hill = dg_rgb(0x10,0x1C,0x38); ground = dg_rgb(0x0A,0x14,0x1C);
+            } else {                     /* 图3 绿野 */
+                sky = dg_rgb(0x3A,0x7A,0xC0); sun = dg_rgb(0xFF,0xE0,0x80);
+                hill = dg_rgb(0x2E,0x5A,0x3A); ground = dg_rgb(0x1C,0x44,0x28);
+            }
+            dg_text(bx, by, "照片查看器", fg, body);
+            dg_text(bx + 120u, by, dg_ph_idx == 0u ? "1/3 日出" :
+                            (dg_ph_idx == 1u ? "2/3 星空" : "3/3 绿野"), blue, body);
+            dg_fill(px, py, pw, ph, sky);
+            dg_rect(px, py, pw, ph, dg_rgb(0x0A,0x14,0x22));
+            dg_fill(px + pw - 34u, py + 8u, 22u, 22u, sun);        /* 太阳/月 */
+            dg_fill(px, py + ph - 34u, pw, 34u, ground);           /* 地面 */
+            dg_fill(px + 6u, py + ph - 62u, pw / 3u, 28u, hill);   /* 远山 */
+            dg_fill(px + pw / 3u + 4u, py + ph - 72u, pw / 3u, 38u, hill);
+            if (dg_ph_idx == 1u) {                                  /* 星空点缀 */
+                dg_fill(px + 20u, py + 18u, 2u, 2u, dg_rgb(0xF0,0xF0,0xF0));
+                dg_fill(px + 66u, py + 40u, 2u, 2u, dg_rgb(0xF0,0xF0,0xF0));
+                dg_fill(px + 110u, py + 22u, 2u, 2u, dg_rgb(0xF0,0xF0,0xF0));
+                dg_fill(px + 150u, py + 52u, 2u, 2u, dg_rgb(0xF0,0xF0,0xF0));
+            } else if (dg_ph_idx == 0u) {                           /* 云 */
+                dg_fill(px + 30u, py + 26u, 36u, 8u, dg_rgb(0xE8,0xF0,0xF8));
+                dg_fill(px + 42u, py + 18u, 22u, 8u, dg_rgb(0xE8,0xF0,0xF8));
+            }
+            dg_text(bx, by + 150u, "数字键 1/2/3 切换图片  M 移动  N 最小化  Esc 关闭", gray, body);
+            break;
+        }
+    case 9u: /* 时钟日历：实时时间 + 日期 */
+        {
+            u32 sec, hh, mm;
+            char nb[24];
+            sec = pit_tick_count() / 100u;
+            hh = (10u + sec / 3600u) % 24u;
+            mm = sec % 3600u / 60u;
+            dg_text(bx, by, "时钟日历", fg, body);
+            nb[0] = (char)('0' + hh / 10u); nb[1] = (char)('0' + hh % 10u);
+            nb[2] = ':'; nb[3] = (char)('0' + mm / 10u); nb[4] = (char)('0' + mm % 10u);
+            nb[5] = ':'; nb[6] = (char)('0' + sec % 60u / 10u); nb[7] = (char)('0' + sec % 60u % 10u);
+            nb[8] = 0;
+            dg_fill(bx + 8u, by + 30u, dg_text_w(nb) * 2u, 24u, dg_rgb(0x1E,0x3A,0x5F));
+            dg_text(bx + 10u, by + 34u, nb, dg_rgb(0xF0,0xF0,0xF0), dg_rgb(0x1E,0x3A,0x5F));
+            dg_text(bx + 10u, by + 66u, "2026年10月9日  星期五", fg, body);
+            dg_text(bx + 10u, by + 88u, "系统运行中 · XOS 0.3.0", gray, body);
+            dg_text(bx, by + 150u, "M 移动  N 最小化  W 切换  Esc 关闭", gray, body);
+            break;
+        }
     default: /* 游戏：5x5 收集小游戏 */
         {
             i32 i, j;
@@ -493,11 +565,11 @@ static void dg_render(void)
     dg_fill(370u, 292u, 270u, 68u, dg_rgb(0x2E,0x3C,0x60));
     dg_fill(0u, 356u, DG_W, 64u, dg_rgb(0x14,0x2A,0x1E));           /* 近地 */
 
-    /* 2) 图标：两行四列（窗口打开时仍可见，除被窗口遮挡外） */
+    /* 2) 图标：两行五列（窗口打开时仍可见，除被窗口遮挡外） */
     for (i = 0; i < DG_ICON_N; i++) {
-        u32 col = i % 4u;
-        u32 row = i / 4u;
-        x = 40u + col * 140u;
+        u32 col = i % 5u;
+        u32 row = i / 5u;
+        x = 34u + col * 114u;
         y = 50u + row * 130u;
         dg_icon_pattern(x, y, dg_icons[i].icon);
         if (i == dg_sel && dg_nwin == 0u)
@@ -600,7 +672,9 @@ static void dg_render(void)
 /* ---------------- 初始化与运行 ---------------- */
 int desk_gui_init(void)
 {
+    static u32 dg_inited = 0u;
     u32 a, rc;
+    if (dg_inited) return 0;                  /* 已初始化（图形登录已映射 LFB） */
     rc = display_set_mode(5);                 /* 640x480x32 VBE */
     if (rc != 0) {
         con_puts("  [desk_gui] display_set_mode(5) failed rc=");
@@ -624,6 +698,7 @@ int desk_gui_init(void)
         }
     }
     vmm_flush_tlb_page(DG_LFB);
+    dg_inited = 1u;
     return 0;
 }
 
@@ -977,6 +1052,18 @@ void desk_gui_run(void)
                     if (w->y + w->h + 4u < DG_H - DG_TASKBAR) w->y += 10u;
                 } else if (key == KEY_ENTER || key == KEY_ESC || key == KEY_M) {
                     dg_move_mode = 0u;                       /* 结束移动 */
+                }
+                dg_render();
+                continue;
+            }
+            /* 照片查看器：数字键 1/2/3 切换内置图片 */
+            if (w->icon == 8u) {
+                if (key == KEY_ESC) {
+                    dg_win_close();
+                } else if (key == KEY_M) {
+                    dg_move_mode = 1u;
+                } else if (key == KEY_1 || key == KEY_2 || key == KEY_3) {
+                    dg_ph_idx = key - KEY_1;
                 }
                 dg_render();
                 continue;
