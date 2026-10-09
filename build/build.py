@@ -30,6 +30,7 @@ BOOT_DIR = os.path.join(ROOT, 'boot')
 KERNEL_DIR = os.path.join(ROOT, 'kernel')
 INCLUDE_DIR = os.path.join(ROOT, 'include')
 BUILD = os.path.join(ROOT, 'build')
+USERPROG_DIR = os.path.join(ROOT, 'tools', 'userprog')
 
 IMG_SIZE = 10 * 1024 * 1024
 STAGE2_SECTORS = 32
@@ -56,7 +57,8 @@ CFLAGS = [
     '-fno-asynchronous-unwind-tables', '-fno-unwind-tables',
     '-fno-omit-frame-pointer',   # 栈回溯：异常诊断依赖 EBP 帧链
     '-Wall', '-Wextra', '-Wno-unused-parameter',
-    '-O2', '-I' + INCLUDE_DIR,
+    '-O2', '-fno-inline-functions', '-fno-inline-small-functions',
+    '-fno-inline-functions-called-once', '-I' + INCLUDE_DIR,
 ]
 
 KERNEL_SOURCES = [
@@ -65,6 +67,8 @@ KERNEL_SOURCES = [
     'console.c',
     'string.c',
     'idt.c',
+    'cpu.c',          # CPU 特权级：GDT(ring0/ring3+TSS)/ltr/esp0
+    'user.c',         # ring3 用户态：ELF 用户加载/iret 降权进入/退出回内核
     'e820.c',
     'pmm.c',
     'vmm.c',          # 分页核心：页表、地址转换、标志位、TLB、大页、隔离、ASLR
@@ -212,6 +216,43 @@ def verify_checksum(path):
     print('  完整性回读  : %#06x == %#06x (OK)' % (expect, actual))
 
 
+def build_userprog():
+    """编译 ring3 用户程序（ELF32，-Ttext 0x08000000）并生成 C 数组头嵌入内核。
+    产物：build/hello.elf + include/xos_hello_bin.h（静态数组，供 shell exec 加载）。
+    """
+    src = os.path.join(USERPROG_DIR, 'hello.S')
+    obj = os.path.join(BUILD, 'hello.o')
+    elf = os.path.join(BUILD, 'hello.elf')
+    ldscript = os.path.join(USERPROG_DIR, 'hello.ld')
+
+    run([GCC, '-m32', '-c', src, '-o', obj], '汇编用户程序 hello.S')
+    # 交叉 ld 仅支持 i386pe：先链 PE，再转 ELF32（供内核 ELF 加载器解析）
+    run([LD, '-m', 'i386pe', '-T', ldscript, obj, '-o', elf + '.pe'], '链接用户程序 hello(PE)')
+    run([OBJCOPY, '-O', 'elf32-i386', elf + '.pe', elf], '转换用户程序 hello.elf')
+
+    size = os.path.getsize(elf)
+    if size > 65536:
+        print('[FAIL] 用户程序超出 64KB 上限：%d B' % size)
+        sys.exit(1)
+    print('  hello.elf   : %d B  (加载地址 0x08000000)' % size)
+
+    # 生成 C 数组头：static const u8 xos_hello_bin[] / xos_hello_bin_len
+    data = open(elf, 'rb').read()
+    hdr_path = os.path.join(INCLUDE_DIR, 'xos_hello_bin.h')
+    with open(hdr_path, 'w', encoding='utf-8') as f:
+        f.write('/* 自动生成：XOS 内置用户程序（ring3 ELF），勿手改 */\n')
+        f.write('#ifndef _XOS_HELLO_BIN_H\n#define _XOS_HELLO_BIN_H\n')
+        f.write('#include "types.h"\n\n')
+        f.write('static const u8 xos_hello_bin[] = {\n')
+        for i in range(0, len(data), 16):
+            f.write('    ' + ','.join('0x%02x' % b for b in data[i:i+16]) + ',\n')
+        f.write('};\n')
+        f.write('static const u32 xos_hello_bin_len = %d;\n' % len(data))
+        f.write('\n#endif\n')
+    print('  xos_hello_bin.h : %d B  (数组头已生成)' % len(data))
+    return elf
+
+
 def build_boot():
     """MBR：汇编 → PE → 扁平二进制，必须严格 512 字节"""
     src = os.path.join(BOOT_DIR, 'boot.S')
@@ -259,12 +300,22 @@ def build_stage2():
 def ensure_stage2_kernel_secs(kernel_bin):
     """内核扩容后自动同步 stage2.S 的 KERNEL_SECS，防止引导只加载部分内核。
 
-    内核二进制所需扇区数 = ceil(size/512) + 16 扇区余量。若当前 stage2.S 声明值
-    小于所需值，则更新常量并重新汇编 Stage2（此后 make_image 使用新 stage2.bin）。
-    这是"内核膨胀 → 引导加载不完整 → 高地址段读空"类问题的结构性防线。
+    内核二进制所需扇区数 = ceil(size/512)，不加余量——Stage2 实模式将内核加载到
+    0x10000 起，必须保证加载结束地址 < 0xA0000（640KB VGA 显存区边界），否则
+    VirtualBox BIOS int 13h 扩展读在目标跨显存区时挂起（已真机验证：
+    KERNEL_SECS=1152 结束恰 0xA0000 卡死，1088 结束 0x98000 正常）。
+    这是"内核膨胀 → 引导加载跨显存边界 → 读取挂起"类问题的结构性防线。
     """
     size = os.path.getsize(kernel_bin)
-    need = (size + 511) // 512 + 16
+    need = (size + 511) // 512   # 精确扇区数，无余量
+    LOAD_BASE = 0x10000
+    LOAD_LIMIT = 0xA0000         # VGA 显存区起始地址（640KB）
+    if LOAD_BASE + need * 512 > LOAD_LIMIT:
+        print('[FAIL] kernel.bin %d B 加载结束地址 0x%X 超过 VGA 显存边界 0x%X'
+              % (size, LOAD_BASE + need * 512, LOAD_LIMIT))
+        print('       内核必须缩小到 %d B 以内，或更改 Stage2 加载基址'
+              % (LOAD_LIMIT - LOAD_BASE))
+        sys.exit(1)
     if need > KERNEL_SECTORS - 24:   # 给备用副本与分区结构留足空间
         print('[FAIL] kernel.bin 需 %d 扇区，超过安全上限 %d 扇区（KERNEL_SECTORS=%d）'
               % (need, KERNEL_SECTORS - 24, KERNEL_SECTORS))
@@ -352,21 +403,24 @@ def main():
     print('XOS 构建开始')
     print('=' * 60)
 
-    print('[1/4] 构建 MBR')
+    print('[1/5] 构建 MBR')
     boot_bin = build_boot()
 
-    print('[2/4] 构建 Stage2')
+    print('[2/5] 构建 Stage2')
     stage2_bin = build_stage2()
 
-    print('[3/4] 构建内核')
+    print('[2.5/5] 构建用户程序')
+    build_userprog()
+
+    print('[3/5] 构建内核')
     kernel_bin = build_kernel()
 
-    print('[3.5/4] 同步 Stage2 KERNEL_SECS（内核扩容自动更新引导加载扇区数）')
+    print('[3.5/5] 同步 Stage2 KERNEL_SECS（内核扩容自动更新引导加载扇区数）')
     stage2_synced = ensure_stage2_kernel_secs(kernel_bin)
     if stage2_synced is not None:
         stage2_bin = stage2_synced
 
-    print('[4/4] 生成磁盘镜像')
+    print('[4/5] 生成磁盘镜像')
     make_image(boot_bin, stage2_bin, kernel_bin)
 
     print('=' * 60)

@@ -1061,7 +1061,7 @@ void vmm_init(void)
     vmm_mm_pool[0].id       = 0;
     vmm_mm_pool[0].used     = 1;
     vmm_mm_pool[0].refcount = 1;
-    vmm_mm_pool[0].user_access = 0;
+    vmm_mm_pool[0].user_access = 1;   /* 用户程序(ring3)映射进内核地址空间：页表页 PMD 需带 US 位 */
     vmm_mm_pool[0].stack_vma = 0xFFFFFFFFu;
     vmm_mm_used = 1;
     vmm_cur_mm  = &vmm_mm_pool[0];

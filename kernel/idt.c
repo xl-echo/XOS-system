@@ -6,6 +6,8 @@
 #include "string.h"
 #include "vmm.h"
 #include "irq.h"
+#include "cpu.h"
+#include "user.h"
 
 /* --------------------------------------------------------------------------
  * 硬件数据结构
@@ -161,7 +163,8 @@ void irq_install_gates(void)
     for (i = 0; i < 16u; i++) {
         idt_set_gate(IRQ_BASE + i, (u32)irq_stubs[i], KERNEL_CS, 0x8E);
     }
-    idt_set_gate(SYS_CALL_VEC, (u32)syscall_stub, KERNEL_CS, 0x8E);
+    /* int 0x80 系统调用门：DPL=3（0xEE），ring3 用户程序可触发软中断进入内核 */
+    idt_set_gate(SYS_CALL_VEC, (u32)syscall_stub, KERNEL_CS, 0xEE);
 }
 
 /* --------------------------------------------------------------------------
@@ -209,6 +212,18 @@ void isr_handler(isr_regs_t *r)
 {
     u32 v = r->vector;
 
+    /* 诊断：异常(0-31)留痕（int 0x80 系统调用不打印，避免打断用户输出） */
+    if (v < 32u) {
+        con_puts("  [isr] v=");
+        con_put_dec(v);
+        con_puts(" cs=");
+        con_put_hex32(r->cs);
+        con_puts(" eip=");
+        con_put_hex32(r->eip);
+        con_puts("\n");
+        con_flush();
+    }
+
     /* 硬件中断：16 路 IRQ（0x20-0x2F）分发 */
     if (v >= IRQ_BASE && v < IRQ_END) {
         irq_dispatch(r);
@@ -217,6 +232,29 @@ void isr_handler(isr_regs_t *r)
     /* 软中断：int 0x80 */
     if (v == SYS_CALL_VEC) {
         syscall_handler(r);
+        return;
+    }
+    /* ring3 用户程序异常：打印崩溃信息并回内核恢复点（不整体停机） */
+    if ((r->cs & ~3u) == GDT_R3_CODE && user_is_active()) {
+        con_set_color(VGA_LIGHTRED, VGA_BLACK);
+        con_puts("  [user] exception ");
+        con_put_dec(v);
+        con_puts(" (");
+        con_puts(exc_name(v));
+        con_puts(") eip=");
+        con_put_hex32(r->eip);
+        con_puts(" err=");
+        con_put_hex32(r->err);
+        if (v == EXC_PF) {
+            u32 cr2;
+            __asm__ __volatile__("movl %%cr2, %0" : "=r"(cr2));
+            con_puts(" cr2=");
+            con_put_hex32(cr2);
+        }
+        con_puts(" -- killing user program\n");
+        con_set_color(VGA_LIGHTGRAY, VGA_BLACK);
+        con_flush();
+        user_return_to_kernel(r);
         return;
     }
     /* 可恢复缺页 */

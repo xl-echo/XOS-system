@@ -107,6 +107,22 @@ isr_common_stub:
     iret
 
 /* ---------------------------------------------------------------------------
+ * 用户程序退出/ring3 异常后的内核恢复桩：
+ * user_return_to_kernel 把 isr 帧改造成 iret 回此桩（cs=ring0, esp=内核大栈顶）。
+ * 桩恢复内核数据段 → 调用 C 清理（user_after_exit）→ 重入 shell 交互循环。
+ * ------------------------------------------------------------------------- */
+.globl _user_exit_stub
+_user_exit_stub:
+    movw    $0x10, %ax
+    movw    %ax, %ds
+    movw    %ax, %es
+    movw    %ax, %fs
+    movw    %ax, %gs
+    call    _user_after_exit
+1:  hlt
+    jmp     1b
+
+/* ---------------------------------------------------------------------------
  * 16 路硬件中断桩（0x20-0x2F，PIC 重映射后）与软中断桩（int 0x80）
  * 栈布局与异常桩一致（vector 在 [esp+48]，err 在 [esp+52]）。
  * 中断返回需 EOI：由 C 侧 irq_dispatch 完成。

@@ -13,6 +13,9 @@
 #include "../include/pmm.h"
 #include "../include/pm.h"
 #include "../include/desk_gui.h"
+#include "../include/cpu.h"
+#include "../include/user.h"
+#include "../include/xos_hello_bin.h"
 
 /* ---------------- 端口 IO（8042 软复位用） ---------------- */
 static inline void x_outb(u16 port, u8 val)
@@ -79,6 +82,42 @@ static void cmd_desktop(u32 argc, char (*argv)[SH_MAX_CMD])
     con_puts("Desktop exited, back to terminal.\n");
 }
 
+/* ring3 用户程序执行：加载内置 hello.elf → iret 进用户态 → 退出回内核 */
+static void cmd_exec(u32 argc, char (*argv)[SH_MAX_CMD])
+{
+    u32 entry = 0u, rc;
+
+    (void)argc; (void)argv;
+    if (!cpu_user_supported()) {
+        con_puts("  [exec] ring3 not ready\n");
+        return;
+    }
+    con_puts("  [exec] loading built-in user program...\n");
+    rc = user_load_elf(xos_hello_bin, xos_hello_bin_len, &entry);
+    if (rc != 0u) {
+        con_puts("  [exec] load failed rc=");
+        con_put_dec(rc);
+        con_puts("\n");
+        return;
+    }
+    con_puts("  [exec] entry=");
+    con_put_hex32(entry);
+    con_puts(" pages=");
+    con_put_dec(user_pages_used());
+    con_puts(" esp0=");
+    con_put_hex32(cpu_tss_get_esp0());
+    con_puts("\n  [exec] entering ring3...\n");
+    con_flush();
+
+    /* 进入 ring3：hello 在用户态运行，int 0x80 完成系统调用。
+     * 用户程序退出/ring3 异常时 user_return_to_kernel 把 isr 帧改造成
+     * iret 回 user_exit_stub（汇编桩）→ user_after_exit 清理 → 重入 shell，
+     * 因此本函数不会沿原路返回（此处为防御性尾保护）。 */
+    user_exec(entry);
+    con_puts("  [exec] user program exited, back to kernel\n");
+    user_cleanup();
+}
+
 static const struct cmd cmds[] = {
     { "help",     "list commands",       cmd_help },
     { "clear",    "clear screen",        cmd_clear },
@@ -90,6 +129,7 @@ static const struct cmd cmds[] = {
     { "poweroff", "power off",           cmd_poweroff },
     { "shutdown", "power off",           cmd_poweroff },
     { "exit",     "exit shell",          cmd_exit },
+    { "exec",     "run ring3 user prog", cmd_exec },
     /* 应用层 */
     { "calc",     "calculator",          cmd_calc },
     { "clock",    "show clock",          cmd_clock },

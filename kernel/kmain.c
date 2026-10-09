@@ -40,6 +40,8 @@
 #include "widget.h"
 #include "font.h"
 #include "app.h"  /* 第 27 册：安全机制子系统 */
+#include "cpu.h"   /* ring3 用户态：GDT/TSS 特权级 */
+#include "user.h"  /* ring3 用户程序加载与执行 */
 #include "shell.h" /* 第 25 册：用户空间 Shell */
 #include "multiuser.h" /* 第 26 册：多用户与权限 */
 #include "pm.h"       /* 第 28 册：电源管理 */
@@ -64,6 +66,9 @@ extern u8 __bss_end[];
 
 static u32 tests_run    = 0;
 static u32 tests_failed = 0;
+
+/* 独立内核大栈顶（pmm 高位分配，TSS.esp0 使用） */
+static u32 g_kstack_top = 0u;
 
 /* --------------------------------------------------------------------------
  * 检查项登记：既即时打印，也登记到表内，最终汇总成一份紧凑清单。
@@ -534,6 +539,7 @@ void kmain(void)
         u32 sbase = pmm_alloc_high_pages(16);   /* 64KB 连续物理页，取受管内存最高处 */
         if (sbase != 0u) {
             u32 stop = (sbase + 16u * 4096u - 4u) & ~0xFu;
+            g_kstack_top = sbase + 16u * 4096u; /* 记录栈顶（TSS.esp0 用） */
             kstack_switch(stop);
         }
     }
@@ -882,6 +888,23 @@ void kmain(void)
     app_dump();
     stage_pause();
 
+    /* ---- CPU 特权级（ring3 用户态基础）：重建 GDT(ring0/ring3+TSS) ---- */
+    section("[26.5/27] Initializing CPU privilege levels (GDT/TSS, ring3)...\n");
+    {
+        u32 cur_esp;
+        __asm__ __volatile__("movl %%esp, %0" : "=r"(cur_esp));
+        (void)cur_esp;
+        cpu_gdt_init(g_kstack_top);   /* esp0 = 独立内核大栈顶（ring3 陷入用） */
+    }
+    report("GDT ring0/ring3 segments + TSS esp0 / selftest",
+           "CPU privilege-level self-test", cpu_selftest());
+
+    /* ---- ring3 用户态执行：ELF 用户加载 + 特权级进入/退出 ---- */
+    section("[26.7/27] Initializing user-mode execution (ring3)...\n");
+    report("ELF map(PTE_US) / user stack / iret ring3 enter / syscall 0x80 DPL3 / exit-to-kernel",
+           "User-mode execution self-test", user_selftest());
+    stage_pause();
+
     section("[27/28] Initializing user-space shell...\n");
     shell_init();
     report("parse / quote / redirect / pipe / background / env set-get-expand / jobs / history",
@@ -997,6 +1020,7 @@ summary:
         desk_gui_run();                     /* 图形桌面；Esc 退出回文本终端 */
         con_puts("  Entering interactive shell. Type 'help' for commands.\n");
         con_flush();
+        user_set_shell_entry((u32)shell_interactive);   /* ring3 退出后重入 shell */
         shell_interactive();
     }
 

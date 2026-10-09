@@ -554,12 +554,12 @@ void kfree(void *ptr)
 }
 
 /* ---- 对外分配入口 ---- */
-void *kmalloc(size_t size, u32 align, u32 flags)
+__attribute__((noinline)) void *kmalloc(size_t size, u32 align, u32 flags)
 {
     return kmalloc_node(size, align, flags, 0u);
 }
 
-void *kmalloc_node(size_t size, u32 align, u32 flags, u32 node)
+__attribute__((noinline)) void *kmalloc_node(size_t size, u32 align, u32 flags, u32 node)
 {
     u32 eflags;
     void *r;
@@ -1246,12 +1246,12 @@ static u32 st_leaktbl(void)
 {
     u32 before;
     void *p;
-    before = kheap_leak_used;
+    before = kheap_leak_report();
     p = kmalloc(256u, 8u, 0u);
     if (!p) return 52u;
-    if (kheap_leak_used <= before) { kfree(p); return 53u; }
+    if (kheap_leak_report() <= before) { kfree(p); return 53u; }
     kfree(p);
-    if (kheap_leak_used != before) return 54u;
+    if (kheap_leak_report() != before) return 54u;
     return 0u;
 }
 
