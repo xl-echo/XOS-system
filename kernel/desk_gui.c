@@ -296,6 +296,7 @@ static u32  dg_move_mode = 0u; /* 移动模式 */
 #define DG_MENU_RIGHT  2u
 static u32  dg_menu    = DG_MENU_NONE;
 static u32  dg_wx_idx  = 0u;              /* 天气：0晴 1多云 2雨 3雪 */
+static u32  dg_set_page = 0u;            /* 设置中心页签：0概览 1驱动 2存储 3关于 */
 static u32  dg_menusel = 0u;
 
 static const char *dg_apps[DG_ICON_N] = {
@@ -417,35 +418,60 @@ static void dg_win_content(const dg_win_t *w)
             dg_text(bx, by + 132u, "输入地址  Enter导航  Esc关闭  M移动", gray, body);
             break;
         }
-    case 5u: /* 设置：真实系统信息 */
+    case 5u: /* 设置中心：1概览 2驱动 3存储 4关于 */
         {
-            u32 i, pmem, pproc;
-            extern u32 pmm_total_pages(void);
+            u32 pmem, pproc;
             extern u32 desk_task_count(void);
             pmem = pmm_total_pages() * 4u / 1024u;         /* MB */
             pproc = desk_task_count();
-            dg_text(bx, by, "设置中心", fg, body);
-            dg_text(bx, by + 22u, "  [1] 内存:  ", fg, body);
-            {
-                char nb[24];
-                dg_text(bx + 88u, by + 22u, "128 MB", blue, body);
-                (void)nb;
-            }
-            dg_text(bx, by + 44u, "  [2] 进程数: ", fg, body);
-            {
+            if (dg_set_page == 0u) {
                 char nb[16];
-                u32 q;
-                nb[0] = (char)('0' + pproc / 10u);
-                nb[1] = (char)('0' + pproc % 10u);
-                nb[2] = 0;
-                for (q = 0u; nb[q]; q++);
-                dg_text(bx + 88u, by + 44u, nb, blue, body);
+                dg_text(bx, by, "设置中心 - 系统概览 [1]", fg, body);
+                dg_text(bx + 4u, by + 24u, "系统:  XOS 0.3.0", fg, body);
+                dg_text(bx + 4u, by + 46u, "架构:  x86 (Intel 32位)", fg, body);
+                dg_text(bx + 4u, by + 68u, "内存:  ", fg, body);
+                dg_u2s(pmem, nb);
+                dg_text(bx + 64u, by + 68u, nb, blue, body);
+                dg_text(bx + 92u, by + 68u, " MB", gray, body);
+                dg_text(bx + 4u, by + 90u, "进程:  ", fg, body);
+                dg_u2s(pproc, nb);
+                dg_text(bx + 64u, by + 90u, nb, blue, body);
+                dg_text(bx + 4u, by + 112u, "显示:  640x480 32位色", fg, body);
+                dg_text(bx, by + 136u, "数字 1-4 切换页签  Esc关闭  M移动", gray, body);
+            } else if (dg_set_page == 1u) {
+                dg_text(bx, by, "设置中心 - 硬件驱动 [2]", fg, body);
+                dg_text(bx + 4u, by + 24u, "键盘:  PS/2 已加载", dg_rgb(0x22,0x88,0x22), body);
+                dg_text(bx + 4u, by + 46u, "鼠标:  待接入", gray, body);
+                dg_text(bx + 4u, by + 68u, "显示:  Bochs VBE 640x480x32", dg_rgb(0x22,0x88,0x22), body);
+                dg_text(bx + 4u, by + 90u, "磁盘:  ATA 已加载 (xos.img)", dg_rgb(0x22,0x88,0x22), body);
+                dg_text(bx + 4u, by + 112u, "串口:  COM1 已加载 (调试日志)", dg_rgb(0x22,0x88,0x22), body);
+                dg_text(bx, by + 136u, "数字 1-4 切换页签  Esc关闭  M移动", gray, body);
+            } else if (dg_set_page == 2u) {
+                char nb[16];
+                int fd = fs_open("/note.txt", O_READ);
+                u32 sz = 0u;
+                char t[8];
+                if (fd >= 0) { sz = (u32)fs_read(fd, t, 7u); fs_close(fd); }
+                dg_text(bx, by, "设置中心 - 存储 [3]", fg, body);
+                dg_text(bx + 4u, by + 24u, "磁盘:  10 MB 虚拟盘 (xos.img)", fg, body);
+                dg_text(bx + 4u, by + 46u, "根目录:  /mnt /dev /note.txt", fg, body);
+                dg_text(bx + 4u, by + 68u, "note.txt 大小: ", fg, body);
+                dg_u2s(sz, nb);
+                dg_text(bx + 140u, by + 68u, nb, blue, body);
+                dg_text(bx + 160u, by + 68u, " 字节", gray, body);
+                dg_text(bx + 4u, by + 90u, "文件系统: XOS-FS v1 (自研)", fg, body);
+                dg_text(bx, by + 136u, "数字 1-4 切换页签  Esc关闭  M移动", gray, body);
+            } else {
+                dg_text(bx, by, "设置中心 - 关于 [4]", fg, body);
+                dg_text(bx + 4u, by + 24u, "XOS 操作系统 0.3.0", blue, body);
+                dg_text(bx + 4u, by + 46u, "完全自研 x86 内核 + 图形桌面", fg, body);
+                dg_text(bx + 4u, by + 68u, "不依赖任何外部内核或闭源组件", fg, body);
+                dg_text(bx + 4u, by + 90u, "官方账号: admin / admin123", fg, body);
+                dg_text(bx + 4u, by + 112u, "技术支持: 内置于终端 help 命令", fg, body);
+                dg_text(bx, by + 136u, "数字 1-4 切换页签  Esc关闭  M移动", gray, body);
             }
-            dg_text(bx, by + 66u, "  [3] 屏幕: 640x480x32", fg, body);
-            dg_text(bx, by + 88u, "  [4] 账户: admin", fg, body);
-            dg_text(bx, by + 132u, "M 移动  N 最小化  W 切换  Esc 关闭", gray, body);
-            break;
         }
+        break;
     case 6u: /* 音乐播放器：真实时钟进度 */
         {
             u32 sec = 0u;
@@ -1263,6 +1289,18 @@ void desk_gui_run(void)
                     dg_move_mode = 1u;
                 } else if (key == KEY_1 || key == KEY_2 || key == KEY_3) {
                     dg_ph_idx = key - KEY_1;
+                }
+                dg_render();
+                continue;
+            }
+            /* 设置中心：数字键 1-4 切换页签 */
+            if (w->icon == 5u) {
+                if (key == KEY_ESC) {
+                    dg_win_close();
+                } else if (key == KEY_M) {
+                    dg_move_mode = 1u;
+                } else if (key >= KEY_1 && key <= KEY_4) {
+                    dg_set_page = key - KEY_1;
                 }
                 dg_render();
                 continue;
