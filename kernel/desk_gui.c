@@ -39,6 +39,8 @@ static u32  dg_gm_mode = 0u;            /* 0收集 1=2048 */
 static u32  dg_g2048[16];               /* 2048 棋盘 */
 static u32  dg_2048_score = 0u;         /* 2048 分数 */
 static u32  dg_2048_over  = 0u;         /* 无空位=结束 */
+static u32  dg_wsz        = 0u;         /* 窗口尺寸档：0标准 1大 2特大 */
+static const u16 dg_win_sz[3][2] = { {300u,200u}, {420u,280u}, {560u,380u} };
 /* 照片查看器：当前图片索引 0-2 */
 static u32  dg_ph_idx = 0u;
 /* 秒表状态 */
@@ -332,6 +334,12 @@ static void dg_win_content(const dg_win_t *w)
     u32 blue = dg_rgb(0x1E,0x6F,0xD0);
     u32 gray = dg_rgb(0x60,0x60,0x60);
     u32 bx = w->x + 16u, by = w->y + 44u;
+    u32 dy = (w->h > 70u) ? (w->h - 30u) / 8u : 18u;
+    u32 dy2, dy3, dy4, dy5, dy6, dy7;
+    if (dy < 16u) dy = 16u;
+    if (dy > 42u) dy = 42u;
+    dy2 = 2u * dy; dy3 = 3u * dy; dy4 = 4u * dy;
+    dy5 = 5u * dy; dy6 = 6u * dy; dy7 = 7u * dy;
     switch (w->icon) {
     case 0u: /* 文件管理器 v2：目录导航 + 查看 */
         {
@@ -354,7 +362,7 @@ static void dg_win_content(const dg_win_t *w)
                     if (fs_readdir(path, di, nm) != 0) break;
                     if (nm[0] == 0) break;
                     n++;
-                    dg_text(bx + 4u, by + 22u + ln * 22u,
+                    dg_text(bx + 4u, by + dy + ln * dy,
                             ln == dg_fm_sel ? " >" : "  ", dg_rgb(0xE8,0xA0,0x30), body);
                     /* 尝试按文件打开：成功=文件，失败=目录 */
                     {
@@ -364,29 +372,29 @@ static void dg_win_content(const dg_win_t *w)
                         while (base[j]) { fp[j] = base[j]; j++; }
                         { u32 k = 0u; while (nm[k] && j + k < 60u) { fp[j + k] = nm[k]; k++; } fp[j + k] = 0; }
                         if (fs_open(fp, O_READ) >= 0) {
-                            dg_text(bx + 12u, by + 22u + ln * 22u, "[F]", dg_rgb(0x2A,0x8A,0x3A), body);
+                            dg_text(bx + 12u, by + dy + ln * 22u, "[F]", dg_rgb(0x2A,0x8A,0x3A), body);
                         } else {
-                            dg_text(bx + 12u, by + 22u + ln * 22u, "[D]", dg_rgb(0x1E,0x6F,0xD0), body);
+                            dg_text(bx + 12u, by + dy + ln * 22u, "[D]", dg_rgb(0x1E,0x6F,0xD0), body);
                         }
                     }
-                    dg_text(bx + 30u, by + 22u + ln * 22u, nm, fg, body);
+                    dg_text(bx + 30u, by + dy + ln * 22u, nm, fg, body);
                     ln++;
                     di++;
                     if (ln >= 5u) break;
                 }
-                if (!ln) dg_text(bx, by + 22u, "(empty)", gray, body);
+                if (!ln) dg_text(bx, by + dy, "(empty)", gray, body);
             }
-            dg_text(bx, by + 132u, "Enter进入/查看  Backspace返回  Esc关闭  M移动", gray, body);
+            dg_text(bx, by + dy6, "Enter进入/查看  Backspace返回  Esc关闭  M移动", gray, body);
         }
         break;
     case 1u: /* 文本编辑器：真实输入 + 保存到 /note.txt + 历史回读（打开时预读） */
         dg_text(bx, by, "note.txt - 文本编辑器", fg, body);
-        dg_text(bx + 4u, by + 22u, w->inlen ? w->inbuf : "(输入文本，Enter 保存)",
+        dg_text(bx + 4u, by + dy, w->inlen ? w->inbuf : "(输入文本，Enter 保存)",
                 dg_rgb(0xF0,0xF0,0xF0), body);
-        dg_text(bx + 4u, by + 44u, w->out[0], gray, body);
-        dg_text(bx + 4u, by + 66u, w->out[2], blue, body);
-        dg_text(bx + 4u, by + 88u, w->out[1], fg, body);
-        dg_text(bx, by + 132u, "字母数字输入  Enter保存  Esc关闭  M移动", gray, body);
+        dg_text(bx + 4u, by + dy2, w->out[0], gray, body);
+        dg_text(bx + 4u, by + dy3, w->out[2], blue, body);
+        dg_text(bx + 4u, by + dy4, w->out[1], fg, body);
+        dg_text(bx, by + dy6, "字母数字输入  Enter保存  Esc关闭  M移动", gray, body);
         break;
     case 2u: /* 计算器：真实输入与四则求值 */
         {
@@ -403,7 +411,7 @@ static void dg_win_content(const dg_win_t *w)
             dg_text(bx + 12u, by + 63u, "1", fg, dg_rgb(0xC8,0xCC,0xD0));
             dg_text(bx + 64u, by + 63u, "2", fg, dg_rgb(0xC8,0xCC,0xD0));
             dg_text(bx + 116u, by + 63u, "3", fg, dg_rgb(0xC8,0xCC,0xD0));
-            dg_text(bx, by + 110u, "数字+运算符  Enter=  Backspace=删  Esc=关", gray, body);
+            dg_text(bx, by + dy5, "数字+运算符  Enter=  Backspace=删  Esc=关", gray, body);
             break;
         }
     case 3u: /* 图形终端：真实命令执行 */
@@ -414,10 +422,10 @@ static void dg_win_content(const dg_win_t *w)
             dg_text(bx + 40u, by, w->inbuf, dg_rgb(0xF0,0xF0,0xF0), dg_rgb(0x10,0x10,0x18));
             for (j = 0u; j < 4u; j++) {
                 if (w->out[j][0])
-                    dg_text(bx + 4u, by + 22u + j * 22u, w->out[j],
+                    dg_text(bx + 4u, by + dy + j * 22u, w->out[j],
                             dg_rgb(0xE0,0xE0,0xE0), dg_rgb(0x10,0x10,0x18));
             }
-            dg_text(bx, by + 132u, "输入命令: help echo mem df ps uptime clear", gray, body);
+            dg_text(bx, by + dy6, "输入命令: help echo mem df ps uptime clear", gray, body);
             break;
         }
     case 4u: /* 浏览器：地址栏 + 内置页面 */
@@ -451,7 +459,7 @@ static void dg_win_content(const dg_win_t *w)
                 dg_text(bx + 4u, by + 72u, "输入 xos://about 等地址回车导航", dg_rgb(0xE0,0xE0,0xE0), body);
                 dg_text(bx + 4u, by + 94u, "（无网络栈，内置页面离线可用）", gray, body);
             }
-            dg_text(bx, by + 132u, "输入地址  Enter导航  Esc关闭  M移动", gray, body);
+            dg_text(bx, by + dy6, "输入地址  Enter导航  Esc关闭  M移动", gray, body);
             break;
         }
     case 5u: /* 设置中心：1概览 2驱动 3存储 4关于 */
@@ -514,9 +522,9 @@ static void dg_win_content(const dg_win_t *w)
             const char *tracks[3] = { "XOS 主题曲", "启动协奏", "桌面圆舞曲" };
             if (dg_mu_play) sec = (pit_tick_count() - dg_mu_start) / 100u;
             dg_text(bx, by, "音乐播放器", fg, body);
-            dg_text(bx + 4u, by + 22u, dg_mu_play ? "▶ 播放中" : "⏸ 已暂停", blue, body);
-            dg_fill(bx + 4u, by + 44u, 180u, 6u, dg_rgb(0x30,0x40,0x50));
-            dg_fill(bx + 4u, by + 44u, (sec % 60u) * 3u, 6u, dg_rgb(0x50,0xC8,0x70));
+            dg_text(bx + 4u, by + dy, dg_mu_play ? "▶ 播放中" : "⏸ 已暂停", blue, body);
+            dg_fill(bx + 4u, by + dy2, 180u, 6u, dg_rgb(0x30,0x40,0x50));
+            dg_fill(bx + 4u, by + dy2, (sec % 60u) * 3u, 6u, dg_rgb(0x50,0xC8,0x70));
             dg_text(bx + 4u, by + 58u, tracks[dg_mu_track % 3u], dg_rgb(0xE0,0xE0,0xE0), body);
             {
                 char nb[16];
@@ -540,7 +548,7 @@ static void dg_win_content(const dg_win_t *w)
                 nb[4] = 0;
                 dg_text(bx + 152u, by + 80u, nb, fg, body);
             }
-            dg_text(bx, by + 110u, "P播放/暂停  N下一曲  +/-音量  M移动  Esc关闭", gray, body);
+            dg_text(bx, by + dy5, "P播放/暂停  N下一曲  +/-音量  M移动  Esc关闭", gray, body);
             break;
         }
     case 8u: /* 照片查看器：内置像素画 1/2/3 切换 */
@@ -576,7 +584,7 @@ static void dg_win_content(const dg_win_t *w)
                 dg_fill(px + 30u, py + 26u, 36u, 8u, dg_rgb(0xE8,0xF0,0xF8));
                 dg_fill(px + 42u, py + 18u, 22u, 8u, dg_rgb(0xE8,0xF0,0xF8));
             }
-            dg_text(bx, by + 150u, "数字键 1/2/3 切换图片  M 移动  N 最小化  Esc 关闭", gray, body);
+            dg_text(bx, by + dy7, "数字键 1/2/3 切换图片  M 移动  N 最小化  Esc 关闭", gray, body);
             break;
         }
     case 11u: /* 天气 */
@@ -595,7 +603,7 @@ static void dg_win_content(const dg_win_t *w)
             dg_text(bx + 4u, by + 68u, "体感: ", gray, body);
             dg_text(bx + 64u, by + 68u, "适宜户外活动", wc, body);
             dg_text(bx + 4u, by + 90u, "数字 1-4 切换天气类型  (1晴 2多云 3雨 4雪)", gray, body);
-            dg_text(bx, by + 132u, "1-4切换  Esc关闭  M移动", gray, body);
+            dg_text(bx, by + dy6, "1-4切换  Esc关闭  M移动", gray, body);
         }
         break;
     case 10u: /* 系统监控 */
@@ -637,7 +645,7 @@ static void dg_win_content(const dg_win_t *w)
             dg_u2s(pst.free_regions, b1);
             dg_text(bx + 74u, by + 96u, b1, fg, body);
             dg_text(bx + 100u, by + 96u, "  (按 U 刷新)", gray, body);
-            dg_text(bx, by + 132u, "U刷新  Esc关闭  M移动", gray, body);
+            dg_text(bx, by + dy6, "U刷新  Esc关闭  M移动", gray, body);
         }
         break;
     case 9u: /* 时钟日历 + 秒表 */
@@ -654,7 +662,7 @@ static void dg_win_content(const dg_win_t *w)
             nb[8] = 0;
             dg_fill(bx + 8u, by + 30u, dg_text_w(nb) * 2u, 24u, dg_rgb(0x1E,0x3A,0x5F));
             dg_text(bx + 10u, by + 34u, nb, dg_rgb(0xF0,0xF0,0xF0), dg_rgb(0x1E,0x3A,0x5F));
-            dg_text(bx + 10u, by + 66u, "2026年10月9日  星期五", fg, body);
+            dg_text(bx + 10u, by + dy3, "2026年10月9日  星期五", fg, body);
             /* 秒表 */
             {
                 u32 st = dg_st_running ? (pit_tick_count() - dg_st_start) / 100u
@@ -668,12 +676,12 @@ static void dg_win_content(const dg_win_t *w)
                 sb[11] = (char)('0' + sm / 10u); sb[12] = (char)('0' + sm % 10u);
                 sb[13] = ':'; sb[14] = (char)('0' + ss / 10u); sb[15] = (char)('0' + ss % 10u);
                 sb[16] = 0;
-                dg_text(bx + 10u, by + 88u, sb, dg_rgb(0x30,0xC0,0x50), body);
-                dg_text(bx + 110u, by + 88u, dg_st_running ? "●运行中" : "○已停止",
+                dg_text(bx + 10u, by + dy4, sb, dg_rgb(0x30,0xC0,0x50), body);
+                dg_text(bx + 110u, by + dy4, dg_st_running ? "●运行中" : "○已停止",
                         dg_st_running ? dg_rgb(0x30,0xC0,0x50) : gray, body);
             }
             dg_text(bx + 10u, by + 112u, "系统运行中 · XOS 0.3.0", gray, body);
-            dg_text(bx, by + 150u, "S 秒表启停  R 复位  M 移动  N 最小化  Esc 关闭", gray, body);
+            dg_text(bx, by + dy7, "S 秒表启停  R 复位  M 移动  N 最小化  Esc 关闭", gray, body);
             break;
         }
     default: /* 游戏中心：1 收集  2 2048 */
@@ -708,8 +716,8 @@ static void dg_win_content(const dg_win_t *w)
                 if (dg_2048_over) dg_text(bx + 8u, by + 172u, "GAME OVER (S 重开)", dg_rgb(0xE0,0x40,0x40), body);
                 nb[0] = 'S'; nb[1] = 'c'; nb[2] = 'o'; nb[3] = 'r'; nb[4] = 'e'; nb[5] = ':';
                 dg_itoa((int)dg_2048_score, nb + 6);
-                dg_text(bx + 8u, by + 132u, nb, dg_rgb(0xE8,0xC0,0x30), body);
-                dg_text(bx, by + 152u, "方向键移动  S重开  Esc关闭", gray, body);
+                dg_text(bx + 8u, by + dy6, nb, dg_rgb(0xE8,0xC0,0x30), body);
+                dg_text(bx, by + dy7, "方向键移动  S重开  Esc关闭", gray, body);
             } else {
                 /* 收集：5x5 */
                 dg_text(bx, by, "收集 · " "2切2048  Esc关闭", fg, body);
@@ -723,12 +731,30 @@ static void dg_win_content(const dg_win_t *w)
                 }
                 nb[0] = 'S'; nb[1] = 'c'; nb[2] = 'o'; nb[3] = 'r'; nb[4] = 'e'; nb[5] = ':';
                 dg_itoa((int)dg_gm_score, nb + 6);
-                dg_text(bx + 8u, by + 132u, nb, dg_rgb(0x30,0xC0,0x50), body);
-                dg_text(bx, by + 152u, "方向键移动 Enter收集 S重置 Esc关闭", gray, body);
+                dg_text(bx + 8u, by + dy6, nb, dg_rgb(0x30,0xC0,0x50), body);
+                dg_text(bx, by + dy7, "方向键移动 Enter收集 S重置 Esc关闭", gray, body);
             }
             break;
         }
         break;
+    }
+}
+
+static u32 dg_win_accent(u32 icon)
+{
+    switch (icon) {
+    case 0u: return dg_rgb(0x2F,0x7D,0xE1);   /* 文件-蓝 */
+    case 1u: return dg_rgb(0x90,0x90,0x90);   /* 文本-灰 */
+    case 2u: return dg_rgb(0x88,0x8C,0x90);   /* 计算器 */
+    case 3u: return dg_rgb(0x30,0xC0,0x50);   /* 终端-绿 */
+    case 4u: return dg_rgb(0x1E,0x6F,0xD0);   /* 浏览器 */
+    case 5u: return dg_rgb(0x50,0x5A,0x66);   /* 设置 */
+    case 6u: return dg_rgb(0x50,0xC8,0x70);   /* 音乐 */
+    case 7u: return dg_rgb(0xE0,0x48,0x48);   /* 游戏 */
+    case 8u: return dg_rgb(0xE8,0xA0,0x40);   /* 照片 */
+    case 9u: return dg_rgb(0x58,0x88,0xC0);   /* 时钟 */
+    case 10u: return dg_rgb(0x90,0xE8,0x90);  /* 监控 */
+    default: return dg_rgb(0x40,0xA0,0xE0);   /* 天气 */
     }
 }
 
@@ -739,7 +765,13 @@ static void dg_window_draw(const dg_win_t *w)
     const char *name = dg_icons[w->icon].name;
     dg_fill(w->x, w->y, w->w, w->h, body);
     dg_fill(w->x, w->y, w->w, 26u, title);
-    dg_text(w->x + 10u, w->y + 9u, name, dg_rgb(0xF0,0xF0,0xF0), title);
+    /* 左侧应用色条（直观识别应用类别） */
+    dg_fill(w->x + 5u, w->y + 6u, 5u, 14u, dg_win_accent(w->icon));
+    dg_text(w->x + 16u, w->y + 9u, name, dg_rgb(0xF0,0xF0,0xF0), title);
+    /* 右侧尺寸档位 */
+    dg_text(w->x + w->w - 40u, w->y + 9u,
+            dg_wsz == 0u ? "1x" : (dg_wsz == 1u ? "2x" : "3x"),
+            dg_rgb(0xE8,0xC8,0x4A), title);
     dg_rect(w->x, w->y, w->w, w->h, dg_rgb(0x0A,0x14,0x22));
     /* 关闭按钮 X */
     dg_fill(w->x + w->w - 24u, w->y + 5u, 18u, 16u, dg_rgb(0xC0,0x30,0x30));
@@ -1267,8 +1299,8 @@ static void dg_win_open(u32 icon)
     dg_wins[slot].icon = icon;
     dg_wins[slot].x = 100u + (slot % 3u) * 36u;
     dg_wins[slot].y = 60u + (slot % 3u) * 30u;
-    dg_wins[slot].w = 400u;
-    dg_wins[slot].h = 260u;
+    dg_wins[slot].w = dg_win_sz[dg_wsz][0];
+    dg_wins[slot].h = dg_win_sz[dg_wsz][1];
     dg_wins[slot].min = 0u;
     dg_wins[slot].inlen = 0u;
     dg_wins[slot].inbuf[0] = 0;
@@ -1392,6 +1424,15 @@ void desk_gui_run(void)
                 } else if (key == KEY_ENTER || key == KEY_ESC || key == KEY_M) {
                     dg_move_mode = 0u;                       /* 结束移动 */
                 }
+                dg_render();
+                continue;
+            }
+            /* G 键窗口缩放（输入型窗口保留按键输入） */
+            if (key == KEY_G && w->icon != 1u && w->icon != 2u &&
+                w->icon != 3u && w->icon != 4u) {
+                dg_wsz = (dg_wsz + 1u) % 3u;
+                w->w = dg_win_sz[dg_wsz][0];
+                w->h = dg_win_sz[dg_wsz][1];
                 dg_render();
                 continue;
             }
