@@ -15,6 +15,7 @@
 #include "../include/task.h"
 #include "../include/irq.h"
 #include "../include/shell.h"
+#include "../include/rtc.h"
 
 static inline u8 x_inb(u16 port)
 {
@@ -52,12 +53,19 @@ static const char *const g_docs[] = {
     "",
     "三、应用命令",
     "  calc     计算器(表达式+括号+ans)",
-    "  clock    时钟显示        setclock <时> <分> 设置时间",
+    "  clock    时钟显示        date    显示/设置日期时间",
+    "  setclock <时> <分> 设置时间",
     "  edit <f> 文本编辑器      clip    系统剪贴板",
     "  note     记事本追加      touch   创建空文件",
     "  gsearch  文件搜索        beep    扬声器蜂鸣",
     "  snake    贪吃蛇          g2048   2048 游戏",
-    "  uptime   运行时间",
+    "  uptime   运行时间(含RTC) dmesg   内核日志",
+    "  ps       内核任务表      crashdump 崩溃转储",
+    "",
+    "三.5、date 用法",
+    "  date                 显示当前日期时间",
+    "  date YYYY MM DD HH MM [SS]  设置日期时间",
+    "  * 基于真实 CMOS RTC，重启后保留",
     "",
     "四、登录与安全",
     "  * 首次开机创建管理员(admin/admin123)",
@@ -179,9 +187,15 @@ void cmd_uptime(u32 argc, char (*argv)[SH_MAX_CMD])
 {
     u32 ticks = pit_tick_count();
     u32 sec = ticks / 100u;
-    con_puts("  运行时间: ");
+    char buf[32];
+    rtc_time_t t;
+    con_puts("  当前时间 : ");
+    if (rtc_read_all(&t) == 0) { rtc_format(buf, sizeof(buf), &t); con_puts(buf); }
+    else con_puts("(RTC 不可用)");
+    con_puts("\n");
+    con_puts("  运行时间 : ");
     con_put_dec(sec / 3600u); con_puts("时 ");
     con_put_dec((sec % 3600u) / 60u); con_puts("分 ");
     con_put_dec(sec % 60u); con_puts("秒\n");
-    con_puts("  心跳计数: "); con_put_dec(ticks); con_puts("\n");
+    con_puts("  心跳计数 : "); con_put_dec(ticks); con_puts("\n");
 }

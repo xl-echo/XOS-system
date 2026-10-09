@@ -323,6 +323,8 @@ void cmd_df(u32 argc, char (*argv)[SH_MAX_CMD])
 
 void cmd_ps(u32 argc, char (*argv)[SH_MAX_CMD])
 {
+    con_puts("--- XOS 内核任务表 ---\n");
+    task_dump();
     con_puts("--- XOS 应用进程表 ---\n");
     app_dump();
     con_puts("  调度心跳   : ");

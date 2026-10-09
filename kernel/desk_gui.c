@@ -19,6 +19,7 @@
 #include "pmm.h"
 #include "task.h"
 #include "sound.h"
+#include "rtc.h"
 #include "xos_wallpaper.h"
 
 extern void *memset(void *dst, int c, unsigned int n);
@@ -1115,21 +1116,51 @@ static void dg_win_content(const dg_win_t *w)
         break;
     case 9u: /* 时钟日历 + 秒表 */
         {
-            u32 sec, hh, mm;
             char nb[24];
-            sec = pit_tick_count() / 100u;
-            hh = (10u + (i32)(sec / 3600u) + dg_tz_off[dg_tz] + 24u) % 24u;
-            mm = sec % 3600u / 60u;
+            rtc_time_t rt;
+            if (rtc_read_all(&rt) != 0) {
+                rt.hour = 0; rt.min = 0; rt.sec = 0;
+                rt.year = 2026; rt.mon = 10; rt.day = 9; rt.dow = 5;
+            }
             dg_text(bx, by, "时钟日历", fg, body);
             dg_text(bx + dg_text_w("时钟日历") + 8u, by, dg_tz_name[dg_tz],
                     dg_rgb(0xE8,0xC0,0x30), body);
-            nb[0] = (char)('0' + hh / 10u); nb[1] = (char)('0' + hh % 10u);
-            nb[2] = ':'; nb[3] = (char)('0' + mm / 10u); nb[4] = (char)('0' + mm % 10u);
-            nb[5] = ':'; nb[6] = (char)('0' + sec % 60u / 10u); nb[7] = (char)('0' + sec % 60u % 10u);
+            nb[0] = (char)('0' + rt.hour / 10u); nb[1] = (char)('0' + rt.hour % 10u);
+            nb[2] = ':'; nb[3] = (char)('0' + rt.min / 10u); nb[4] = (char)('0' + rt.min % 10u);
+            nb[5] = ':'; nb[6] = (char)('0' + rt.sec / 10u); nb[7] = (char)('0' + rt.sec % 10u);
             nb[8] = 0;
             dg_fill(bx + 8u, by + 30u, dg_text_w(nb) * 2u, 24u, dg_rgb(0x1E,0x3A,0x5F));
             dg_text(bx + 10u, by + 34u, nb, dg_rgb(0xF0,0xF0,0xF0), dg_rgb(0x1E,0x3A,0x5F));
-            dg_text(bx + 10u, by + dy3, "2026年10月9日  星期五", fg, body);
+            {
+                static const u8 cN[7][3] = {
+                    {0xE6,0x97,0xA5}, {0xE4,0xB8,0x80}, {0xE4,0xBA,0x8C},
+                    {0xE4,0xB8,0x89}, {0xE5,0x9B,0x9B}, {0xE4,0xBA,0x94},
+                    {0xE5,0x85,0xAD}};   /* 日一二三四五六 */
+                static const u8 cY[3] = {0xE5,0xB9,0xB4}; /* 年 */
+                static const u8 cM[3] = {0xE6,0x9C,0x88}; /* 月 */
+                static const u8 cD[3] = {0xE6,0x97,0xA5}; /* 日 */
+                static const u8 cX[3] = {0xE6,0x98,0x9F}; /* 星 */
+                static const u8 cQ[3] = {0xE6,0x9C,0x9F}; /* 期 */
+                char db[40];
+                u32 i = 0;
+                u32 k;
+                db[i++] = (char)('0' + rt.year / 1000u % 10u);
+                db[i++] = (char)('0' + rt.year / 100u % 10u);
+                db[i++] = (char)('0' + rt.year / 10u % 10u);
+                db[i++] = (char)('0' + rt.year % 10u);
+                db[i++] = (char)('0' + rt.mon / 10u);
+                db[i++] = (char)('0' + rt.mon % 10u);
+                db[i++] = (char)cM[0]; db[i++] = (char)cM[1]; db[i++] = (char)cM[2];
+                db[i++] = (char)('0' + rt.day / 10u);
+                db[i++] = (char)('0' + rt.day % 10u);
+                db[i++] = (char)cD[0]; db[i++] = (char)cD[1]; db[i++] = (char)cD[2];
+                db[i++] = ' ';
+                db[i++] = (char)cX[0]; db[i++] = (char)cX[1]; db[i++] = (char)cX[2];
+                db[i++] = (char)cQ[0]; db[i++] = (char)cQ[1]; db[i++] = (char)cQ[2];
+                for (k = 0; k < 3u; k++) db[i++] = (char)cN[rt.dow % 7u][k];
+                db[i++] = 0;
+                dg_text(bx + 10u, by + dy3, db, fg, body);
+            }
             /* 秒表 */
             {
                 u32 st = dg_st_running ? (pit_tick_count() - dg_st_start) / 100u
@@ -1397,23 +1428,35 @@ static void dg_render(void)
     dg_fill(DG_W - 128u, DG_H - DG_TASKBAR + 10u, 2u, 8u, dg_rgb(0xE0,0xB0,0x40));
     dg_rect(DG_W - 108u, DG_H - DG_TASKBAR + 8u, 14u, 12u, dg_rgb(0x80,0xE0,0x90));    /* 电池 */
     dg_fill(DG_W - 108u, DG_H - DG_TASKBAR + 8u, 10u, 12u, dg_rgb(0x20,0x50,0x30));
-    /* 时钟：时:分:秒 + 日期 */
-    sec = pit_tick_count() / 100u;
-    hh = (10u + sec / 3600u) % 24u;
-    mm = sec % 3600u / 60u;
-    tbuf[0] = (char)('0' + hh / 10u);
-    tbuf[1] = (char)('0' + hh % 10u);
-    tbuf[2] = ':';
-    tbuf[3] = (char)('0' + mm / 10u);
-    tbuf[4] = (char)('0' + mm % 10u);
-    tbuf[5] = ':';
-    tbuf[6] = (char)('0' + sec % 60u / 10u);
-    tbuf[7] = (char)('0' + sec % 60u % 10u);
-    tbuf[8] = 0;
-    dg_text(DG_W - 70u, DG_H - DG_TASKBAR + 11u, tbuf,
-            dg_rgb(0xF0,0xF0,0xF0), bar);
-    dg_text(DG_W - 152u, DG_H - DG_TASKBAR + 11u, "10-08",
-            dg_rgb(0xA0,0xB0,0xC8), bar);
+    /* 时钟：真实 CMOS RTC（日期 + 时:分:秒） */
+    {
+        char wb2[16];
+        rtc_time_t rt;
+        if (rtc_read_all(&rt) == 0) {
+            tbuf[0] = (char)('0' + rt.hour / 10u);
+            tbuf[1] = (char)('0' + rt.hour % 10u);
+            tbuf[2] = ':';
+            tbuf[3] = (char)('0' + rt.min / 10u);
+            tbuf[4] = (char)('0' + rt.min % 10u);
+            tbuf[5] = ':';
+            tbuf[6] = (char)('0' + rt.sec / 10u);
+            tbuf[7] = (char)('0' + rt.sec % 10u);
+            tbuf[8] = 0;
+            wb2[0] = (char)('0' + rt.mon / 10u);
+            wb2[1] = (char)('0' + rt.mon % 10u);
+            wb2[2] = '-';
+            wb2[3] = (char)('0' + rt.day / 10u);
+            wb2[4] = (char)('0' + rt.day % 10u);
+            wb2[5] = 0;
+            dg_text(DG_W - 70u, DG_H - DG_TASKBAR + 11u, tbuf,
+                    dg_rgb(0xF0,0xF0,0xF0), bar);
+            dg_text(DG_W - 152u, DG_H - DG_TASKBAR + 11u, wb2,
+                    dg_rgb(0xA0,0xB0,0xC8), bar);
+        } else {
+            dg_text(DG_W - 70u, DG_H - DG_TASKBAR + 11u, "--:--:--",
+                    dg_rgb(0xF0,0xF0,0xF0), bar);
+        }
+    }
 
     /* 5) 开始菜单浮层 */
     if (dg_menu == DG_MENU_START) {
