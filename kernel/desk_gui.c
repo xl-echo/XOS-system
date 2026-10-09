@@ -297,6 +297,7 @@ static u32  dg_move_mode = 0u; /* 移动模式 */
 static u32  dg_menu    = DG_MENU_NONE;
 static u32  dg_wx_idx  = 0u;              /* 天气：0晴 1多云 2雨 3雪 */
 static u32  dg_set_page = 0u;            /* 设置中心页签：0概览 1驱动 2存储 3关于 */
+static u32  dg_mu_vol   = 60u;           /* 音乐音量 0-100 */
 static u32  dg_menusel = 0u;
 
 static const char *dg_apps[DG_ICON_N] = {
@@ -491,7 +492,20 @@ static void dg_win_content(const dg_win_t *w)
                 nb[4] = 0;
                 dg_text(bx + 132u, by + 58u, nb, gray, body);
             }
-            dg_text(bx, by + 110u, "P 播放/暂停  N 下一曲  M 移动  Esc 关闭", gray, body);
+            dg_text(bx + 4u, by + 80u, "音量: ", gray, body);
+            dg_fill(bx + 64u, by + 80u, 80u, 5u, dg_rgb(0x30,0x40,0x50));
+            dg_fill(bx + 64u, by + 80u, dg_mu_vol * 80u / 100u, 5u, dg_rgb(0xE8,0xB0,0x30));
+            {
+                char nb[16];
+                u32 vv = dg_mu_vol;
+                nb[0] = (char)('0' + vv / 100u);
+                nb[1] = (char)('0' + (vv % 100u) / 10u);
+                nb[2] = (char)('0' + vv % 10u);
+                nb[3] = '%';
+                nb[4] = 0;
+                dg_text(bx + 152u, by + 80u, nb, fg, body);
+            }
+            dg_text(bx, by + 110u, "P播放/暂停  N下一曲  +/-音量  M移动  Esc关闭", gray, body);
             break;
         }
     case 8u: /* 照片查看器：内置像素画 1/2/3 切换 */
@@ -958,7 +972,11 @@ static void dg_term_exec(dg_win_t *w)
     if (!cmd[0]) {
         w->out[3][0] = 0;
     } else if (cmd[0] == 'h' && cmd[1] == 'e' && cmd[2] == 'l' && cmd[3] == 'p' && cmd[4] == 0) {
-        { u32 j = 0u; const char *s = "help echo mem df ps uptime clear"; while (s[j] && j < 39u) { w->out[3][j] = s[j]; j++; } w->out[3][j] = 0; }
+        { u32 j = 0u; const char *s = "help echo date ver mem df ps uptime clear"; while (s[j] && j < 39u) { w->out[3][j] = s[j]; j++; } w->out[3][j] = 0; }
+    } else if (cmd[0] == 'd' && cmd[1] == 'a' && cmd[2] == 't' && cmd[3] == 'e' && cmd[4] == 0) {
+        { u32 j = 0u; const char *s = "date: 2026-10-09 Friday"; while (s[j] && j < 39u) { w->out[3][j] = s[j]; j++; } w->out[3][j] = 0; }
+    } else if (cmd[0] == 'v' && cmd[1] == 'e' && cmd[2] == 'r' && cmd[3] == 0) {
+        { u32 j = 0u; const char *s = "XOS 0.3.0 (x86) self-hosted"; while (s[j] && j < 39u) { w->out[3][j] = s[j]; j++; } w->out[3][j] = 0; }
     } else if (cmd[0] == 'm' && cmd[1] == 'e' && cmd[2] == 'm' && cmd[3] == 0) {
         extern u32 pmm_total_pages(void);
         char nb[16];
@@ -1330,6 +1348,12 @@ void desk_gui_run(void)
                     dg_mu_play = dg_mu_play ? 0u : 1u;
                 } else if (key == KEY_N) {
                     dg_mu_track++;
+                } else if (key == KEY_PLUS) {
+                    if (dg_mu_vol + 10u <= 100u) dg_mu_vol += 10u;
+                    else dg_mu_vol = 100u;
+                } else if (key == KEY_MINUS) {
+                    if (dg_mu_vol >= 10u) dg_mu_vol -= 10u;
+                    else dg_mu_vol = 0u;
                 } else if (key == KEY_ESC) {
                     dg_win_close();
                 } else if (key == KEY_M) {
