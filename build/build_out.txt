@@ -24,17 +24,17 @@ D:\��ϵͳ���������ĵ�\��Ŀ����\xos\kernel\lo
       |         ^~
 D:\��ϵͳ��������
   [warn] D:\��ϵͳ���������ĵ�\��Ŀ����\xos\kernel\desk_gui.c: In function 'dg_browser_input':
-D:\��ϵͳ���������ĵ�\��Ŀ����\xos\kernel\desk_gui.c:1283:13: warning: unused variable 'i' [-Wunused-variable]
- 1283 |         u32 i = 0u;
+D:\��ϵͳ���������ĵ�\��Ŀ����\xos\kernel\desk_gui.c:1302:13: warning: unused variable 'i' [-Wunused-variable]
+ 1302 |         u32 i = 0u;
       |             ^
 D:\��ϵͳ���������ĵ�\��Ŀ����\xos\kernel\desk_gui.c: In function 'g2048_move':
-D:\��ϵͳ���������ĵ�\��Ŀ����\xos\kernel\desk_gui.c:1332:30: warning: unused variable 'b' [-Wunused-variable]
- 1332 |     u32 moved = 0u, r, c, a, b;
+D:\��ϵͳ���������ĵ�\��Ŀ����\xos\kernel\desk_gui.c:1351:30: warning: unused variable 'b' [-Wunused-variable]
+ 1351 |     u32 moved = 0u, r, c, a, b;
       |                              ^
-D:\��ϵͳ���������ĵ�\��Ŀ����\xos\kernel\desk_gui.c:1332:27: warning: unused variable 'a' [-Wunused-va
+D:\��ϵͳ���������ĵ�\��Ŀ����\xos\kernel\desk_gui.c:1351:27: warning: unused variable 'a' [-Wunused-va
   kernel.bin  : 403136 B  (上限 524288 B)
   size        : text	   data	    bss	    dec	    hex	filename
-  size        :  399556	    576	 236640	 636772	  9b764	D:\��ϵͳ���������ĵ�\��Ŀ����\xos\build\kernel.pe
+  size        :  400292	    576	 236640	 637508	  9ba44	D:\��ϵͳ���������ĵ�\��Ŀ����\xos\build\kernel.pe
 [3.5/4] 同步 Stage2 KERNEL_SECS（内核扩容自动更新引导加载扇区数）
 [4/4] 生成磁盘镜像
   kernel 主副本: LBA 33..1056

@@ -46,6 +46,10 @@ static u32 dg_alm_set   = 0u;         /* 闹钟：0无 1设置中 2已设定 */
 static u32 dg_alm_min   = 0u;         /* 设置中的分钟数 0-99 */
 static u32 dg_alm_target = 0u;        /* 响铃目标 tick */
 static u32 dg_alm_ring  = 0u;         /* 响铃中 */
+static u32 dg_tz        = 0u;         /* 时区索引：0北京 1伦敦 2纽约 3东京 4悉尼 */
+static const i32  dg_tz_off[5] = { 0, -8, -12, 1, 2 };   /* 相对北京：伦敦-8 纽约-12 东京+1 悉尼+2 */
+static const char *dg_tz_name[5] = { "北京", "伦敦", "纽约", "东京", "悉尼" };
+static u32 dg_last_repaint = 0u;      /* 桌面小组件刷新节流 */
 /* 照片查看器：当前图片索引 0-2 */
 static u32  dg_ph_idx = 0u;
 /* 秒表状态 */
@@ -658,9 +662,11 @@ static void dg_win_content(const dg_win_t *w)
             u32 sec, hh, mm;
             char nb[24];
             sec = pit_tick_count() / 100u;
-            hh = (10u + sec / 3600u) % 24u;
+            hh = (10u + (i32)(sec / 3600u) + dg_tz_off[dg_tz] + 24u) % 24u;
             mm = sec % 3600u / 60u;
             dg_text(bx, by, "时钟日历", fg, body);
+            dg_text(bx + dg_text_w("时钟日历") + 8u, by, dg_tz_name[dg_tz],
+                    dg_rgb(0xE8,0xC0,0x30), body);
             nb[0] = (char)('0' + hh / 10u); nb[1] = (char)('0' + hh % 10u);
             nb[2] = ':'; nb[3] = (char)('0' + mm / 10u); nb[4] = (char)('0' + mm % 10u);
             nb[5] = ':'; nb[6] = (char)('0' + sec % 60u / 10u); nb[7] = (char)('0' + sec % 60u % 10u);
@@ -733,7 +739,7 @@ static void dg_win_content(const dg_win_t *w)
             } else {
                 dg_text(bx + 8u, by + dy6, "(G 放大窗口查看日历)", gray, body);
             }
-            dg_text(bx, by + dy7, "S秒表 R复位 A闹钟 M移动 N最小化 Esc关闭", gray, body);
+            dg_text(bx, by + dy7, "S秒表 R复位 A闹钟 T时区 M移动 N最小化 Esc关闭", gray, body);
             break;
         }
     default: /* 游戏中心：1 收集  2 2048 */
@@ -902,6 +908,19 @@ static void dg_render(void)
 
     /* 3.5) 桌面顶部数字直达提示 */
     dg_text(8u, 6u, "数字 1-9 直达应用  0 时钟  Tab 选择  Enter 打开", dg_rgb(0xA0,0xB8,0xD0), dg_rgb(0x10,0x18,0x28));
+    /* 3.6) 桌面时钟小组件（实时刷新） */
+    if (dg_nwin == 0u) {
+        u32 tsc = pit_tick_count() / 100u;
+        u32 th = (10u + tsc / 3600u) % 24u;
+        u32 tm = tsc % 3600u / 60u;
+        u32 ts = tsc % 60u;
+        char wb[16];
+        wb[0] = (char)('0' + th / 10u); wb[1] = (char)('0' + th % 10u);
+        wb[2] = ':'; wb[3] = (char)('0' + tm / 10u); wb[4] = (char)('0' + tm % 10u);
+        wb[5] = ':'; wb[6] = (char)('0' + ts / 10u); wb[7] = (char)('0' + ts % 10u); wb[8] = 0;
+        dg_fill(496u, 4u, dg_text_w(wb) * 2u, 14u, dg_rgb(0x1E,0x3A,0x5F));
+        dg_text(498u, 6u, wb, dg_rgb(0xF0,0xF0,0xF0), dg_rgb(0x1E,0x3A,0x5F));
+    }
     /* 4) 任务栏 */
     dg_fill(0u, DG_H - DG_TASKBAR, DG_W, DG_TASKBAR, bar);
     dg_fill(0u, DG_H - DG_TASKBAR, DG_W, 2u, dg_rgb(0x2E,0x3A,0x4E));
@@ -1437,6 +1456,12 @@ void desk_gui_run(void)
                 sound_beep();
                 dg_render();
             }
+            /* 桌面小组件节流刷新：无窗口/无菜单时每 50 tick(0.5s) 重绘 */
+            if (dg_nwin == 0u && dg_menu == DG_MENU_NONE && !dg_move_mode &&
+                pit_tick_count() - dg_last_repaint >= 50u) {
+                dg_last_repaint = pit_tick_count();
+                dg_render();
+            }
             __asm__ __volatile__("hlt");
             continue;
         }
@@ -1552,6 +1577,8 @@ void desk_gui_run(void)
                 } else if (key == KEY_R) {
                     dg_st_running = 0u;
                     dg_st_total = 0u;
+                } else if (key == KEY_T) {
+                    dg_tz = (dg_tz + 1u) % 5u;              /* 循环切换时区 */
                 } else if (key == KEY_M) {
                     dg_move_mode = 1u;
                 }
