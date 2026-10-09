@@ -1,9 +1,13 @@
-/* XOS 调试与监控 —— 串口输出 / 日志缓冲 / 级别过滤 / 符号与栈回溯 / kgdb 断点 */
+/* XOS 调试与监控 —— 串口输出 / 日志缓冲 / 级别过滤 / 符号与栈回溯 / kgdb 断点
+ * V2：日志时间戳 + 磁盘持久化（关机落盘、启动恢复、dmesg 查看） */
 #include "dbg.h"
 #include "console.h"
+#include "irq.h"       /* pit_tick_count：日志时间戳 */
+#include "disk.h"      /* disk_read/write_sectors：日志落盘 */
 
 typedef struct {
     u32   level;
+    u32   ticks;
     char  line[DBG_LOG_LINE_LEN];
 } dbg_log_t;
 
@@ -12,6 +16,22 @@ static u32       g_log_wr;
 static u32       g_log_count;
 static u32       g_com_sent;
 static u32       g_cur_level;   /* 当前过滤级别 */
+
+/* 持久化恢复缓存：上次关机落盘的日志快照（供 dmesg 展示） */
+static dbg_plog_t g_prev;
+static u32        g_prev_valid;
+
+/* 级别名 */
+static const char *dbg_level_name(u32 level)
+{
+    switch (level) {
+    case DBG_LEVEL_DEBUG: return "dbg";
+    case DBG_LEVEL_INFO:  return "inf";
+    case DBG_LEVEL_WARN:  return "wrn";
+    case DBG_LEVEL_ERROR: return "err";
+    default:              return "???";
+    }
+}
 
 typedef struct {
     char  name[DBG_SYM_LEN];
@@ -45,10 +65,19 @@ static void dbg_strncpy(char *d, const char *s, u32 n)
 void dbg_init(void)
 {
     u32 i;
-    for (i = 0u; i < DBG_LOG_ENTRIES; i++) { g_log[i].level = 0u; g_log[i].line[0] = 0; }
+    for (i = 0u; i < DBG_LOG_ENTRIES; i++) { g_log[i].level = 0u; g_log[i].ticks = 0u; g_log[i].line[0] = 0; }
     g_log_wr = 0u; g_log_count = 0u; g_com_sent = 0u; g_cur_level = DBG_LEVEL_DEBUG;
     for (i = 0u; i < DBG_MAX_SYMS; i++) { g_syms[i].name[0] = 0; g_syms[i].defined = 0u; }
     for (i = 0u; i < DBG_MAX_BP; i++) { g_bp[i].name[0] = 0; g_bp[i].hits = 0u; g_bp[i].enabled = 0u; }
+    g_prev_valid = 0u;
+    g_prev.magic = 0u;
+    g_prev.version = 0u;
+    g_prev.seq = 0u;
+    g_prev.count = 0u;
+    g_prev.ticks = 0u;
+    for (i = 0u; i < DBG_PLOG_MAX; i++) {
+        g_prev.ent[i].ticks = 0u; g_prev.ent[i].level = 0u; g_prev.ent[i].line[0] = 0;
+    }
 }
 
 /* ---------- 串口调试输出（COM1 语义模拟） ---------- */
@@ -70,6 +99,7 @@ int dbg_log_add(u32 level, const char *line)
     if (level < g_cur_level) return 1;   /* 被过滤 */
     i = g_log_wr;
     g_log[i].level = level;
+    g_log[i].ticks = pit_tick_count();
     dbg_strncpy(g_log[i].line, line, DBG_LOG_LINE_LEN - 1u);
     g_log_wr = (g_log_wr + 1u) % DBG_LOG_ENTRIES;
     if (g_log_count < DBG_LOG_ENTRIES) g_log_count++;
@@ -169,6 +199,218 @@ u32 dbg_bp_count(void)
     return c;
 }
 
+/* ============================================================================
+ * 日志磁盘持久化（V2，自研）
+ * 磁盘末尾固定区（末尾 DBG_PLOG_SECTS 扇区）：关机/重启前序列化当前缓冲落盘，
+ * 启动恢复并缓存，dmesg 命令统一展示。不依赖文件系统（Linux pstore 语义）。
+ * ========================================================================== */
+
+/* 日志持久化区：固定位于镜像安全区（LBA 7201 = 内核主/备副本 4096+4096 扇区
+ * 预留之后、镜像末尾之前；kernel.bin 上限 0x90000 → 主副本最远 ~LBA 1164，
+ * 备副本最远 ~LBA 4237，7201 起 16 扇区恒为空闲） */
+#define DBG_PLOG_LBA 7201u
+
+static u32 dbg_plog_lba(void)
+{
+    /* 磁盘容量需覆盖日志区（探测值为 65536 扇区/32MB，足够） */
+    u32 total = disk_capacity_lba(0u);
+    if (total < DBG_PLOG_LBA + DBG_PLOG_SECTS) return 0u;
+    return DBG_PLOG_LBA;
+}
+
+/* 序列化当前环形缓冲（时间序）到持久化结构 */
+static void dbg_plog_snapshot(dbg_plog_t *p)
+{
+    u32 n, i;
+    n = (g_log_count < DBG_PLOG_MAX) ? g_log_count : DBG_PLOG_MAX;
+    p->magic = DBG_PLOG_MAGIC;
+    p->version = DBG_PLOG_VERSION;
+    p->seq = p->seq + 1u;
+    p->count = n;
+    p->ticks = pit_tick_count();
+    /* 环形序：从最旧（g_log_wr - count）开始取 n 条 */
+    for (i = 0u; i < n; i++) {
+        u32 idx = (g_log_wr + DBG_LOG_ENTRIES - n + i) % DBG_LOG_ENTRIES;
+        p->ent[i].ticks = g_log[idx].ticks;
+        p->ent[i].level = g_log[idx].level;
+        dbg_strncpy(p->ent[i].line, g_log[idx].line, DBG_LOG_LINE_LEN - 1u);
+    }
+}
+
+/* 落盘：写磁盘末尾区（reboot/poweroff 前调用） */
+int dbg_log_persist(void)
+{
+    static dbg_plog_t p;                  /* 大缓冲静态化，避免 __chkstk_ms */
+    static u8 raw[DBG_PLOG_SECTS * 512u];
+    u32 lba = dbg_plog_lba();
+
+    if (lba == 0u) return -1;
+    memset(&p, 0, sizeof(p));
+    dbg_plog_snapshot(&p);
+    if (p.count == 0u) return 0;   /* 无可持久化内容 */
+    memset(raw, 0, sizeof(raw));
+    if (sizeof(p) > sizeof(raw)) return -2;   /* 结构超区，拒绝 */
+    memcpy(raw, &p, sizeof(p));
+    {
+        int rc = disk_write_sectors(0u, lba, DBG_PLOG_SECTS, raw);
+        con_puts("  [plog] persist lba=");
+        con_put_dec(lba);
+        con_puts(" count=");
+        con_put_dec(p.count);
+        con_puts(" rc=");
+        con_put_dec(rc);
+        con_putc('\n');
+        return rc;
+    }
+}
+
+/* 恢复：启动读回上次落盘日志，打印摘要并缓存供 dmesg */
+int dbg_log_restore(void)
+{
+    static dbg_plog_t p;                  /* 大缓冲静态化 */
+    static u8 raw[DBG_PLOG_SECTS * 512u];
+    u32 lba = dbg_plog_lba();
+    u32 i;
+    int rc;
+
+    if (lba == 0u) return -1;
+    rc = disk_read_sectors(0u, lba, DBG_PLOG_SECTS, raw);
+    if (rc != 0) {
+        con_puts("  [plog] restore read rc=");
+        con_put_dec(rc);
+        con_putc('\n');
+        return -1;
+    }
+    memcpy(&p, raw, sizeof(p));
+    if (p.magic != DBG_PLOG_MAGIC || p.version != DBG_PLOG_VERSION) {
+        con_puts("  [plog] restore bad magic=");
+        con_put_hex32(p.magic);
+        con_putc('\n');
+        return -1;
+    }
+    if (p.count > DBG_PLOG_MAX) return -1;
+
+    /* 缓存到 g_prev 供 dmesg */
+    memcpy(&g_prev, &p, sizeof(g_prev));
+    g_prev_valid = 1u;
+
+    con_set_color(VGA_YELLOW, VGA_BLACK);
+    con_puts("\n  Previous boot log recovered (seq=");
+    con_put_dec(p.seq);
+    con_puts(", entries=");
+    con_put_dec(p.count);
+    con_puts(", ticks=");
+    con_put_dec(p.ticks);
+    con_puts(")\n");
+    con_set_color(VGA_LIGHTGRAY, VGA_BLACK);
+    for (i = 0u; i < p.count && i < 4u; i++) {
+        con_puts("    [");
+        con_puts(dbg_level_name(p.ent[i].level));
+        con_puts("] ");
+        con_puts(p.ent[i].line);
+        con_putc('\n');
+    }
+    if (p.count > 4u) {
+        con_puts("    ... (");
+        con_put_dec(p.count - 4u);
+        con_puts(" more, use 'dmesg' to view all)\n");
+    }
+    con_flush();
+    return 0;
+}
+
+/* dmesg：级别名 + 时间戳；先显示上次恢复日志，再显示当前缓冲 */
+void dbg_log_show(void)
+{
+    u32 i, n;
+
+    if (g_prev_valid && g_prev.count > 0u) {
+        con_set_color(VGA_YELLOW, VGA_BLACK);
+        con_puts("  --- previous boot (seq ");
+        con_put_dec(g_prev.seq);
+        con_puts(") ---\n");
+        con_set_color(VGA_LIGHTGRAY, VGA_BLACK);
+        for (i = 0u; i < g_prev.count; i++) {
+            con_puts("  [");
+            con_puts(dbg_level_name(g_prev.ent[i].level));
+            con_puts("] t=");
+            con_put_dec(g_prev.ent[i].ticks);
+            con_puts("  ");
+            con_puts(g_prev.ent[i].line);
+            con_putc('\n');
+        }
+    }
+
+    con_set_color(VGA_LIGHTCYAN, VGA_BLACK);
+    con_puts("  --- current boot ---\n");
+    con_set_color(VGA_LIGHTGRAY, VGA_BLACK);
+    n = g_log_count;
+    for (i = 0u; i < n; i++) {
+        u32 idx = (g_log_wr + DBG_LOG_ENTRIES - n + i) % DBG_LOG_ENTRIES;
+        con_puts("  [");
+        con_puts(dbg_level_name(g_log[idx].level));
+        con_puts("] t=");
+        con_put_dec(g_log[idx].ticks);
+        con_puts("  ");
+        con_puts(g_log[idx].line);
+        con_putc('\n');
+    }
+    if (n == 0u && (!g_prev_valid || g_prev.count == 0u))
+        con_puts("  (log empty)\n");
+}
+
+/* 持久化自检：序列化往返（内存模拟），不真实写盘以免污染下次启动 */
+int dbg_selftest_plog(void)
+{
+    static dbg_plog_t p1, p2;             /* 大缓冲静态化 */
+    static u8 raw[DBG_PLOG_SECTS * 512u];
+    static u8 save[sizeof(g_log)];        /* 活日志现场快照（自检会污染环形缓冲） */
+    u32 i;
+    u32 saved_wr = g_log_wr, saved_count = g_log_count;
+    u32 saved_prev = g_prev_valid;
+
+    /* 构造两条日志 → 快照 → 序列化 → 反序列化 → 校验 */
+    memcpy(save, g_log, sizeof(g_log));   /* 先留底 */
+    g_log_wr = 0u; g_log_count = 0u;
+    (void)dbg_log_add(DBG_LEVEL_INFO, "boot ok");
+    (void)dbg_log_add(DBG_LEVEL_ERROR, "oops");
+    memset(&p1, 0, sizeof(p1));
+    dbg_plog_snapshot(&p1);
+    if (p1.magic != DBG_PLOG_MAGIC) return 1;
+    if (p1.count != 2u) return 2;
+    if (p1.ent[0].level != DBG_LEVEL_INFO) return 3;
+    if (p1.ent[1].level != DBG_LEVEL_ERROR) return 4;
+    if (dbg_strcmp(p1.ent[1].line, "oops") != 0) return 5;
+    if (p1.seq != 1u) return 6;               /* 首次快照 seq 从 0 → 1 */
+
+    /* 序列化往返 */
+    memset(raw, 0, sizeof(raw));
+    if (sizeof(p1) > sizeof(raw)) return 7;
+    memcpy(raw, &p1, sizeof(p1));
+    memcpy(&p2, raw, sizeof(p2));
+    if (p2.magic != DBG_PLOG_MAGIC || p2.version != DBG_PLOG_VERSION) return 8;
+    if (p2.count != 2u) return 9;
+    if (dbg_strcmp(p2.ent[0].line, "boot ok") != 0) return 10;
+    if (dbg_strcmp(p2.ent[1].line, "oops") != 0) return 11;
+    if (p2.seq != p1.seq) return 12;
+
+    /* 边界：count 上限裁剪 */
+    for (i = 0u; i < DBG_PLOG_MAX + 4u; i++) {
+        char ln[16];
+        ln[0] = 'P'; ln[1] = (char)('0' + (i % 10u)); ln[2] = 0;
+        (void)dbg_log_add(DBG_LEVEL_WARN, ln);
+    }
+    memset(&p1, 0, sizeof(p1));
+    dbg_plog_snapshot(&p1);
+    if (p1.count != DBG_LOG_ENTRIES) return 13;   /* 环形缓冲深度上限 */
+
+    /* 恢复现场（含环形缓冲内容，不留自检残留） */
+    g_log_wr = saved_wr; g_log_count = saved_count;
+    g_prev_valid = saved_prev;
+    memcpy(g_log, save, sizeof(g_log));
+    return 0;
+}
+
 /* ---------- 自检 ---------- */
 
 int dbg_selftest(void)
@@ -265,6 +507,22 @@ int dbg_selftest(void)
     if (dbg_log_dump(buf, sizeof(buf)) != 0) return 38;
     if (dbg_backtrace(fp, 4u, out, 2u) != 2) return 39;
     if (dbg_bp_count() == 0u) return 40;
+
+    /* 41-42: 日志持久化往返（V2） */
+    {
+        int prc = dbg_selftest_plog();
+        if (prc != 0) {
+            con_puts("  [plog] self-test rc=");
+            con_put_dec(prc);
+            con_puts(" (count=");
+            con_put_dec(g_log_count);
+            con_puts(" wr=");
+            con_put_dec(g_log_wr);
+            con_puts(")\n");
+            return 41;
+        }
+    }
+    if (g_prev_valid != 0u) return 42;   /* 自检不应污染恢复缓存 */
 
     return 0;
 }

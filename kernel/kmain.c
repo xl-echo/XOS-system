@@ -953,6 +953,7 @@ void kmain(void)
     dbg_init();
     report("COM1 serial / log ring / level filter / symbols backtrace / kgdb",
            "Debug monitor self-test", dbg_selftest());
+    dbg_log_restore();   /* 恢复上次关机落盘的内核日志（磁盘末尾持久化区） */
     stage_pause();
 
     section("[31/32] Initializing test framework...\n");

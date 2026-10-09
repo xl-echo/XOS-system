@@ -226,6 +226,13 @@ int disk_identify(u32 dev, gendisk_t *out)
     return g_disks[dev].present ? 0 : -1;
 }
 
+u32 disk_capacity_lba(u32 dev)
+{
+    if (dev >= DISK_MAX_DEVS) return 0u;
+    if (!g_disks[dev].present) return 0u;
+    return g_disks[dev].lba_count;
+}
+
 /* ---------------- 分区表解析 ---------------- */
 int disk_parse_mbr(const u8 *mbr, partition_t *parts, u32 max)
 {

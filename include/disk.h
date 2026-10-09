@@ -142,6 +142,7 @@ void disk_poll(void);                       /* 轮询热插拔/省电状态 */
 int  disk_read_sectors(u32 dev, u32 lba, u32 count, u8 *buf);
 int  disk_write_sectors(u32 dev, u32 lba, u32 count, const u8 *buf);
 int  disk_identify(u32 dev, gendisk_t *out);
+u32  disk_capacity_lba(u32 dev);            /* 磁盘总扇区数（日志持久化区定位用） */
 int  disk_parse_mbr(const u8 *mbr, partition_t *parts, u32 max);
 int  disk_parse_gpt(const u8 *hdr, const u8 *ents, partition_t *parts, u32 max);
 int  disk_bio_submit(bio_t *bio);

@@ -17,6 +17,7 @@
 #include "../include/user.h"
 #include "../include/xos_hello_bin.h"
 #include "../include/crash.h"
+#include "../include/dbg.h"
 
 /* ---------------- 端口 IO（8042 软复位用） ---------------- */
 static inline void x_outb(u16 port, u8 val)
@@ -72,6 +73,7 @@ void cmd_docs(u32 argc, char (*argv)[SH_MAX_CMD]);
 void cmd_gsearch(u32 argc, char (*argv)[SH_MAX_CMD]);
 void cmd_touch(u32 argc, char (*argv)[SH_MAX_CMD]);
 void cmd_beep(u32 argc, char (*argv)[SH_MAX_CMD]);
+void cmd_dmesg(u32 argc, char (*argv)[SH_MAX_CMD]);
 void cmd_crashdump(u32 argc, char (*argv)[SH_MAX_CMD]);
 void cmd_clearcrash(u32 argc, char (*argv)[SH_MAX_CMD]);
 void cmd_uptime(u32 argc, char (*argv)[SH_MAX_CMD]);
@@ -121,6 +123,13 @@ static void cmd_exec(u32 argc, char (*argv)[SH_MAX_CMD])
     user_cleanup();
 }
 
+/* 内核日志查看（dmesg）：上次关机日志 + 本次启动日志 */
+void cmd_dmesg(u32 argc, char (*argv)[SH_MAX_CMD])
+{
+    (void)argc; (void)argv;
+    dbg_log_show();
+}
+
 /* 崩溃转储查看：显示固定内存区保存的 panic 现场 */
 void cmd_crashdump(u32 argc, char (*argv)[SH_MAX_CMD])
 {
@@ -165,6 +174,7 @@ static const struct cmd cmds[] = {
     { "gsearch",  "search file by name", cmd_gsearch },
     { "touch",    "create empty file",   cmd_touch },
     { "beep",     "speaker beep",        cmd_beep },
+    { "dmesg",    "show kernel log",     cmd_dmesg },
     { "crashdump","show crash dump",     cmd_crashdump },
     { "clearcrash","clear crash dump",   cmd_clearcrash },
     { "uptime",   "uptime stats",        cmd_uptime },
@@ -249,6 +259,9 @@ static void cmd_mem(u32 argc, char (*argv)[SH_MAX_CMD])
 
 static void cmd_reboot(u32 argc, char (*argv)[SH_MAX_CMD])
 {
+    con_puts("Persisting kernel log...\n");
+    con_flush();
+    dbg_log_persist();               /* 关机前把日志缓冲落盘（磁盘末尾区） */
     con_puts("Rebooting...\n");
     con_flush();
     x_outb(0x64, 0xFE);          /* 8042 软复位（标准、安全） */
@@ -257,6 +270,9 @@ static void cmd_reboot(u32 argc, char (*argv)[SH_MAX_CMD])
 
 static void cmd_poweroff(u32 argc, char (*argv)[SH_MAX_CMD])
 {
+    con_puts("Persisting kernel log...\n");
+    con_flush();
+    dbg_log_persist();               /* 关机前把日志缓冲落盘（磁盘末尾区） */
     con_puts("Powering off...\n");
     con_flush();
     pm_shutdown();
