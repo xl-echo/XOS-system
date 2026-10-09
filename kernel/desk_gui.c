@@ -316,12 +316,13 @@ static void dg_win_content(const dg_win_t *w)
             dg_text(bx, by + 132u, "M 移动  N 最小化  W 切换  Esc 关闭", gray, body);
         }
         break;
-    case 1u: /* 文本编辑器：真实输入 + 保存到 /note.txt */
+    case 1u: /* 文本编辑器：真实输入 + 保存到 /note.txt + 历史回读（打开时预读） */
         dg_text(bx, by, "note.txt - 文本编辑器", fg, body);
         dg_text(bx + 4u, by + 22u, w->inlen ? w->inbuf : "(输入文本，Enter 保存)",
                 dg_rgb(0xF0,0xF0,0xF0), body);
         dg_text(bx + 4u, by + 44u, w->out[0], gray, body);
-        dg_text(bx + 4u, by + 66u, "已保存到真实文件系统 /note.txt", blue, body);
+        dg_text(bx + 4u, by + 66u, w->out[2], blue, body);
+        dg_text(bx + 4u, by + 88u, w->out[1], fg, body);
         dg_text(bx, by + 132u, "字母数字输入  Enter保存  Esc关闭  M移动", gray, body);
         break;
     case 2u: /* 计算器：真实输入与四则求值 */
@@ -754,27 +755,41 @@ static void dg_itoa(int v, char *out)
     out[j] = 0;
 }
 
-/* 简单四则求值：a op b（仅一个运算符） */
+/* 四则求值：支持 a+b+c...（从左到右，乘除优先后算） */
 static int dg_calc_eval(const char *s, int *res)
 {
-    int a = 0, b = 0, i = 0;
-    char op;
+    int vals[8];
+    char ops[8];
+    int nv = 0, no = 0, i = 0, v = 0, j;
     if (!s || !s[0]) return 0;
-    while (s[i] >= '0' && s[i] <= '9') { a = a * 10 + (s[i] - '0'); i++; }
-    if (i == 0) return 0;                 /* 必须以数字开头 */
-    op = s[i];
-    if (op != '+' && op != '-' && op != '*' && op != '/') return 0;
-    i++;
-    while (s[i] == ' ') i++;
-    if (!(s[i] >= '0' && s[i] <= '9')) return 0;
-    while (s[i] >= '0' && s[i] <= '9') { b = b * 10 + (s[i] - '0'); i++; }
-    if (s[i] != 0) return 0;
-    switch (op) {
-    case '+': *res = a + b; break;
-    case '-': *res = a - b; break;
-    case '*': *res = a * b; break;
-    case '/': if (b == 0) return 0; *res = a / b; break;
-    default: return 0;
+    /* 解析数字与运算符 */
+    while (s[i] != 0) {
+        if (s[i] >= '0' && s[i] <= '9') { v = v * 10 + (s[i] - '0'); i++; }
+        else if (s[i] == '+' || s[i] == '-' || s[i] == '*' || s[i] == '/') {
+            if (nv >= 7) return 0;
+            vals[nv++] = v; v = 0;
+            ops[no++] = s[i];
+            i++;
+        } else if (s[i] == ' ') { i++; }
+        else return 0;
+    }
+    if (nv == 0 && v == 0 && s[0] == '0') { vals[nv++] = 0; }
+    else { vals[nv++] = v; }
+    if (nv < 2 || nv - 1 != no) { if (nv == 1) { *res = vals[0]; return 1; } return 0; }
+    /* 先算乘除 */
+    j = 0;
+    for (i = 0; i < no; i++) {
+        if (ops[i] == '*') { vals[j] = vals[j] * vals[i + 1]; }
+        else if (ops[i] == '/') {
+            if (vals[i + 1] == 0) return 0;
+            vals[j] = vals[j] / vals[i + 1];
+        } else { j++; vals[j] = vals[i + 1]; }
+    }
+    /* 再算加减（从左到右） */
+    *res = vals[0];
+    for (i = 0, j = 0; i < no; i++) {
+        if (ops[i] == '+') { j++; *res += vals[j]; }
+        else if (ops[i] == '-') { j++; *res -= vals[j]; }
     }
     return 1;
 }
@@ -933,6 +948,7 @@ static void dg_edit_input(dg_win_t *w, u32 key)
             /* 回显到 out 缓冲首行 */
             while (w->inbuf[i] && i < 39u) { w->out[0][i] = w->inbuf[i]; i++; }
             w->out[0][i] = 0;
+            w->out[1][0] = 0;              /* 下次渲染重读历史 */
         } else {
             u32 i = 0u;
             const char *s = "save failed";
@@ -999,6 +1015,24 @@ static void dg_win_open(u32 icon)
     dg_wins[slot].inlen = 0u;
     dg_wins[slot].inbuf[0] = 0;
     { u32 q; for (q = 0u; q < 4u; q++) dg_wins[slot].out[q][0] = 0; }
+    if (icon == 1u) {
+        int fd = fs_open("/note.txt", O_READ);
+        char buf[96];
+        u32 rd = 0u, j;
+        if (fd >= 0) {
+            rd = (u32)fs_read(fd, buf, 88u);
+            fs_close(fd);
+            buf[rd] = 0;
+        }
+        if (rd == 0u) { const char *e = "(no note yet)"; rd = 0u; while (e[rd]) rd++; j = 0u; while (j < rd && j < 39u) { dg_wins[slot].out[1][j] = e[j]; j++; } }
+        else { for (j = 0u; j < rd && j < 39u; j++) dg_wins[slot].out[1][j] = buf[j]; }
+        dg_wins[slot].out[1][j] = 0;
+        dg_wins[slot].out[2][0] = 'h'; dg_wins[slot].out[2][1] = 'i';
+        dg_wins[slot].out[2][2] = 's'; dg_wins[slot].out[2][3] = 't';
+        dg_wins[slot].out[2][4] = 'o'; dg_wins[slot].out[2][5] = 'r';
+        dg_wins[slot].out[2][6] = 'y'; dg_wins[slot].out[2][7] = ':';
+        dg_wins[slot].out[2][8] = 0;
+    }
     dg_focus = slot;
     dg_nwin++;
     dg_move_mode = 0u;
