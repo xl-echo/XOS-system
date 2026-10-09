@@ -18,6 +18,7 @@
 #include "fs.h"
 #include "pmm.h"
 #include "task.h"
+#include "sound.h"
 
 extern void *memset(void *dst, int c, unsigned int n);
 
@@ -41,6 +42,10 @@ static u32  dg_2048_score = 0u;         /* 2048 分数 */
 static u32  dg_2048_over  = 0u;         /* 无空位=结束 */
 static u32  dg_wsz        = 0u;         /* 窗口尺寸档：0标准 1大 2特大 */
 static const u16 dg_win_sz[3][2] = { {300u,200u}, {420u,280u}, {560u,380u} };
+static u32 dg_alm_set   = 0u;         /* 闹钟：0无 1设置中 2已设定 */
+static u32 dg_alm_min   = 0u;         /* 设置中的分钟数 0-99 */
+static u32 dg_alm_target = 0u;        /* 响铃目标 tick */
+static u32 dg_alm_ring  = 0u;         /* 响铃中 */
 /* 照片查看器：当前图片索引 0-2 */
 static u32  dg_ph_idx = 0u;
 /* 秒表状态 */
@@ -680,8 +685,29 @@ static void dg_win_content(const dg_win_t *w)
                 dg_text(bx + 110u, by + dy4, dg_st_running ? "●运行中" : "○已停止",
                         dg_st_running ? dg_rgb(0x30,0xC0,0x50) : gray, body);
             }
-            dg_text(bx + 10u, by + 112u, "系统运行中 · XOS 0.3.0", gray, body);
-            dg_text(bx, by + dy7, "S 秒表启停  R 复位  M 移动  N 最小化  Esc 关闭", gray, body);
+            /* 闹钟状态行 */
+            if (dg_alm_ring) {
+                dg_text(bx + 10u, by + 112u, "闹钟到点！按任意键关闭", dg_rgb(0xE0,0x30,0x30), body);
+            } else if (dg_alm_set == 1u) {
+                char ab[16];
+                u32 v = dg_alm_min;
+                dg_text(bx + 10u, by + 112u, "闹钟设置: 输入分钟(0-99) Enter确认", dg_rgb(0x1E,0x6F,0xD0), body);
+                ab[0] = (char)('0' + v / 10u);
+                ab[1] = (char)('0' + v % 10u);
+                ab[2] = ' '; ab[3] = 'm'; ab[4] = 'i'; ab[5] = 'n'; ab[6] = 0;
+                dg_text(bx + 10u, by + dy6, ab, dg_rgb(0xF0,0xF0,0xF0), body);
+            } else if (dg_alm_set == 2u) {
+                u32 rem = (dg_alm_target > pit_tick_count()) ? (dg_alm_target - pit_tick_count()) / 100u : 0u;
+                char ab[16];
+                u32 s2 = rem % 60u, m2 = rem / 60u;
+                dg_text(bx + 10u, by + 112u, "闹钟已设定 剩余: ", dg_rgb(0x30,0xC0,0x50), body);
+                ab[0] = (char)('0' + m2 / 10u); ab[1] = (char)('0' + m2 % 10u);
+                ab[2] = ':'; ab[3] = (char)('0' + s2 / 10u); ab[4] = (char)('0' + s2 % 10u); ab[5] = 0;
+                dg_text(bx + 10u, by + dy6, ab, dg_rgb(0xE0,0xE0,0xE0), body);
+            } else {
+                dg_text(bx + 10u, by + 112u, "闹钟: 未设定 (A 设置)", gray, body);
+            }
+            dg_text(bx, by + dy7, "S秒表 R复位 A闹钟 M移动 N最小化 Esc关闭", gray, body);
             break;
         }
     default: /* 游戏中心：1 收集  2 2048 */
@@ -1377,6 +1403,14 @@ void desk_gui_run(void)
         u32 key;
         kbd_poll();
         if (kbd_read_event(&ev) != 0) {
+            /* 闹钟心跳：无键时由 PIT 定时中断唤醒检查到点 */
+            if (dg_alm_set == 2u && !dg_alm_ring &&
+                pit_tick_count() >= dg_alm_target) {
+                dg_alm_ring = 1u;
+                sound_beep();
+                sound_beep();
+                dg_render();
+            }
             __asm__ __volatile__("hlt");
             continue;
         }
@@ -1453,12 +1487,34 @@ void desk_gui_run(void)
                 dg_render();
                 continue;
             }
-            /* 时钟日历：S 秒表启停  R 复位 */
+            /* 时钟日历：S 秒表启停  R 复位  A 闹钟 */
             if (w->icon == 9u) {
-                if (key == KEY_ESC) {
+                if (dg_alm_ring) {
+                    dg_alm_ring = 0u;                       /* 任意键关闭闹钟 */
+                    dg_alm_set = 0u;
+                    sound_silence();
+                } else if (key == KEY_ESC) {
                     dg_win_close();
-                } else if (key == KEY_M) {
-                    dg_move_mode = 1u;
+                } else if (key == KEY_A) {
+                    if (dg_alm_set == 2u || dg_alm_set == 1u) {
+                        dg_alm_set = 0u; dg_alm_min = 0u;   /* 取消/退出设置 */
+                    } else {
+                        dg_alm_set = 1u; dg_alm_min = 0u;
+                    }
+                } else if (dg_alm_set == 1u) {
+                    if (key >= KEY_0 && key <= KEY_9) {
+                        u32 n = key - KEY_0;
+                        if (dg_alm_min < 10u) dg_alm_min = dg_alm_min * 10u + n;
+                    } else if (key == KEY_ENTER) {
+                        if (dg_alm_min > 0u) {
+                            dg_alm_target = pit_tick_count() + dg_alm_min * 6000u;
+                            dg_alm_set = 2u;
+                        } else {
+                            dg_alm_set = 0u;                 /* 0 分钟 = 取消 */
+                        }
+                    } else if (key == KEY_BACKSP) {
+                        dg_alm_min /= 10u;
+                    }
                 } else if (key == KEY_S) {
                     if (dg_st_running) {
                         dg_st_total += (pit_tick_count() - dg_st_start) / 100u;
@@ -1470,6 +1526,15 @@ void desk_gui_run(void)
                 } else if (key == KEY_R) {
                     dg_st_running = 0u;
                     dg_st_total = 0u;
+                } else if (key == KEY_M) {
+                    dg_move_mode = 1u;
+                }
+                /* 响铃检测 */
+                if (dg_alm_set == 2u && !dg_alm_ring &&
+                    pit_tick_count() >= dg_alm_target) {
+                    dg_alm_ring = 1u;
+                    sound_beep();
+                    sound_beep();
                 }
                 dg_render();
                 continue;
