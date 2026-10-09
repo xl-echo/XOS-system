@@ -49,6 +49,7 @@
 #include "tester.h"   /* 第 30 册：测试与验证 */
 #include "dbg.h"      /* 第 31 册：调试与监控 */
 #include "crash.h"     /* 崩溃转储：panic 现场持久化 + 启动恢复报告 */
+#include "rtc.h"       /* 实时时钟：CMOS RTC 真实读取 + date 命令 */
 #include "inst.h"     /* 第 32 册：安装程序-包管理 */
 #include "virt.h"     /* 第 33 册：虚拟化支持 */
 #include "shell_interactive.h" /* 交互式终端 Shell（自检通过后接管控制台） */
@@ -849,6 +850,13 @@ void kmain(void)
 
     section("[20/21] Initializing security subsystem...\n");
     sec_init();
+
+    section("[20.5/21] Initializing real-time clock (CMOS RTC)...\n");
+    rtc_init();
+    report("CMOS RTC / BCD / leap-year / timestamp / format",
+           "Real-time clock self-test", rtc_selftest());
+    rtc_dump();
+    stage_pause();
 
     section("[21/22] Initializing GUI graphics subsystem...\n");
     gui_init();

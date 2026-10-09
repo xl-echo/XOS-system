@@ -58,6 +58,7 @@ static void cmd_exit(u32 argc, char (*argv)[SH_MAX_CMD]);
 /* 应用层命令（apps_*.c，全局导出） */
 void cmd_calc(u32 argc, char (*argv)[SH_MAX_CMD]);
 void cmd_clock(u32 argc, char (*argv)[SH_MAX_CMD]);
+void cmd_date(u32 argc, char (*argv)[SH_MAX_CMD]);
 void cmd_setclock(u32 argc, char (*argv)[SH_MAX_CMD]);
 void cmd_sysinfo(u32 argc, char (*argv)[SH_MAX_CMD]);
 void cmd_df(u32 argc, char (*argv)[SH_MAX_CMD]);
@@ -159,6 +160,7 @@ static const struct cmd cmds[] = {
     /* 应用层 */
     { "calc",     "calculator",          cmd_calc },
     { "clock",    "show clock",          cmd_clock },
+    { "date",     "show/set date time",  cmd_date },
     { "setclock", "set clock HH MM",     cmd_setclock },
     { "sysinfo",  "system info panel",   cmd_sysinfo },
     { "df",       "memory disk stats",   cmd_df },

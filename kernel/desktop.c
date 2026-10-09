@@ -5,6 +5,7 @@
 #include "desktop.h"
 #include "console.h"
 #include "string.h"
+#include "rtc.h"
 
 extern void *memset(void *dst, int c, unsigned int n);
 extern int strcmp(const char *a, const char *b);
@@ -305,10 +306,16 @@ u32 desk_notify_count(void)
     return n;
 }
 
-/* ---------------- 7. 时钟与日历 ---------------- */
+/* ---------------- 7. 时钟与日历（真实 CMOS RTC） ---------------- */
 int desk_clock_set(u32 hour, u32 minute)
 {
+    rtc_time_t t;
     if (hour > 23u || minute > 59u) return -1;
+    /* 基于当前时间只改时分，避免整组读写破坏日期 */
+    if (rtc_read_all(&t) != 0) return -2;
+    t.hour = hour;
+    t.min = minute;
+    if (rtc_set_time(&t) != 0) return -3;
     desk_hour = hour;
     desk_min = minute;
     return 0;
@@ -316,7 +323,12 @@ int desk_clock_set(u32 hour, u32 minute)
 
 int desk_clock_get(u32 *hour, u32 *minute)
 {
+    rtc_time_t t;
     if (!hour || !minute) return -1;
+    if (rtc_read_all(&t) == 0) {
+        desk_hour = t.hour;           /* 以真实 RTC 为准 */
+        desk_min = t.min;
+    }
     *hour = desk_hour;
     *minute = desk_min;
     return 0;

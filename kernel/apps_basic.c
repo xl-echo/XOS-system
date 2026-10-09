@@ -21,8 +21,11 @@
 #include "../include/desktop.h"
 #include "../include/irq.h"
 #include "../include/shell.h"
+#include "../include/rtc.h"
 
 #define APPS_MAX_LINE 96u
+
+void cmd_date(u32 argc, char (*argv)[SH_MAX_CMD]);
 
 i64 g_calc_last;
 
@@ -166,25 +169,26 @@ void cmd_calc(u32 argc, char (*argv)[SH_MAX_CMD])
     }
 }
 
-/* ---------------- clock / setclock ---------------- */
+/* ---------------- clock / setclock / date（真实 CMOS RTC） ---------------- */
 void cmd_clock(u32 argc, char (*argv)[SH_MAX_CMD])
 {
-    u32 h, m, i;
-    con_puts("XOS clock  按 q 退出；setclock <时> <分> 可设置时间\n");
+    u32 i;
+    char buf[32];
+    rtc_time_t t;
+    con_puts("XOS clock  真实 CMOS RTC；按 q/Esc 退出；date 可查看完整日期\n");
     for (i = 0; i < 10; i++) {
         kbd_event_t ev;
-        desk_clock_get(&h, &m);
-        con_set_color(VGA_LIGHTCYAN, VGA_BLACK);
-        con_puts("\r  时间: ");
-        con_put_dec(h);
-        con_putc(':');
-        if (m < 10) con_putc('0');
-        con_put_dec(m);
-        con_puts("   (tick=");
-        con_put_dec(pit_tick_count());
-        con_puts(")   ");
-        con_set_color(VGA_LIGHTGRAY, VGA_BLACK);
-        con_flush();
+        if (rtc_read_all(&t) == 0) {
+            rtc_format(buf, sizeof(buf), &t);
+            con_set_color(VGA_LIGHTCYAN, VGA_BLACK);
+            con_puts("\r  现在: ");
+            con_puts(buf);
+            con_puts("   (tick=");
+            con_put_dec(pit_tick_count());
+            con_puts(")   ");
+            con_set_color(VGA_LIGHTGRAY, VGA_BLACK);
+            con_flush();
+        }
         if (kbd_read_event(&ev) == 0) {
             if ((ev.type == EV_CHAR && (ev.ch == 'q' || ev.ch == 'Q')) ||
                 (ev.type == EV_KEY_DOWN && ev.key == KEY_ESC))
@@ -193,6 +197,47 @@ void cmd_clock(u32 argc, char (*argv)[SH_MAX_CMD])
         msleep(1000);
     }
     con_puts("\n");
+}
+
+/* date：显示或设置完整日期时间（date / date YYYY-MM-DD HH:MM[:SS]） */
+void cmd_date(u32 argc, char (*argv)[SH_MAX_CMD])
+{
+    rtc_time_t t;
+    char buf[32];
+    if (argc < 2) {
+        if (rtc_read_all(&t) != 0) { con_puts("date: RTC 不可用\n"); return; }
+        rtc_format(buf, sizeof(buf), &t);
+        con_puts(buf);
+        con_puts("   (ts=");
+        con_put_dec64((u64)rtc_to_timestamp(&t));
+        con_puts(")\n");
+        return;
+    }
+    /* date YYYY-MM-DD HH:MM[:SS] */
+    if (argc >= 3) {
+        u32 y, m, d, h, mi, s = 0u;
+        y = (u32)atoi(argv[1]);
+        m = (u32)atoi(argv[2]);
+        d = (u32)atoi(argv[3]);
+        h = (u32)atoi(argv[4]);
+        mi = (u32)atoi(argv[5]);
+        if (argc >= 7) s = (u32)atoi(argv[6]);
+        if (y < 2000u || y > 2099u || m < 1u || m > 12u || d < 1u ||
+            d > rtc_days_in_month(y, m) || h > 23u || mi > 59u || s > 59u) {
+            con_puts("date: 参数非法 (YYYY MM DD HH MM [SS])\n");
+            return;
+        }
+        t.year = y; t.mon = m; t.day = d; t.hour = h; t.min = mi; t.sec = s;
+        t.dow = (u32)((rtc_days_from_civil(y, m, d) + 4u) % 7u);   /* 1970-01-01=周四 */
+        if (rtc_set_time(&t) != 0) { con_puts("date: 设置失败\n"); return; }
+        con_puts("date: 已设置 -> ");
+        rtc_format(buf, sizeof(buf), &t);
+        con_puts(buf);
+        con_puts("\n");
+    } else {
+        con_puts("usage: date           显示当前日期时间\n");
+        con_puts("       date <YYYY> <MM> <DD> <HH> <MM> [<SS>]   设置时间\n");
+    }
 }
 
 void cmd_setclock(u32 argc, char (*argv)[SH_MAX_CMD])
@@ -215,6 +260,14 @@ void cmd_sysinfo(u32 argc, char (*argv)[SH_MAX_CMD])
     pages = pmm_total_pages(); used = pmm_used_pages(); reserved = pmm_reserved_pages();
     con_puts("========== XOS 系统信息 ==========\n");
     con_puts("  内核       : XOS v1.0 自研 x86 操作系统\n");
+    con_puts("  当前时间   : ");
+    {
+        char buf[32];
+        rtc_time_t t;
+        if (rtc_read_all(&t) == 0) { rtc_format(buf, sizeof(buf), &t); con_puts(buf); }
+        else con_puts("(RTC 不可用)");
+    }
+    con_puts("\n");
     con_puts("  运行时间   : ");
     con_put_dec(pit_tick_count() / 100u);
     con_puts(" 秒\n");
