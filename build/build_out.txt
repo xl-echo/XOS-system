@@ -24,15 +24,18 @@ D:\��ϵͳ���������ĵ�\��Ŀ����\xos\kernel\lo
       |         ^~
 D:\��ϵͳ��������
   [warn] D:\��ϵͳ���������ĵ�\��Ŀ����\xos\kernel\desk_gui.c: In function 'dg_browser_input':
-D:\��ϵͳ���������ĵ�\��Ŀ����\xos\kernel\desk_gui.c:1146:13: warning: unused variable 'i' [-Wunused-variable]
- 1146 |         u32 i = 0u;
+D:\��ϵͳ���������ĵ�\��Ŀ����\xos\kernel\desk_gui.c:1182:13: warning: unused variable 'i' [-Wunused-variable]
+ 1182 |         u32 i = 0u;
       |             ^
+D:\��ϵͳ���������ĵ�\��Ŀ����\xos\kernel\desk_gui.c: In function 'g2048_move':
+D:\��ϵͳ���������ĵ�\��Ŀ����\xos\kernel\desk_gui.c:1231:30: warning: unused variable 'b' [-Wunused-variable]
+ 1231 |     u32 moved = 0u, r, c, a, b;
+      |                              ^
+D:\��ϵͳ���������ĵ�\��Ŀ����\xos\kernel\desk_gui.c:1231:27: warning: unused variable 'a' [-Wunused-va
   kernel.bin  : 399040 B  (上限 524288 B)
   size        : text	   data	    bss	    dec	    hex	filename
-  size        :  394420	    576	 236544	 631540	  9a2f4	D:\��ϵͳ���������ĵ�\��Ŀ����\xos\build\kernel.pe
+  size        :  396484	    576	 236608	 633668	  9ab44	D:\��ϵͳ���������ĵ�\��Ŀ����\xos\build\kernel.pe
 [3.5/4] 同步 Stage2 KERNEL_SECS（内核扩容自动更新引导加载扇区数）
-  stage2.S KERNEL_SECS 自动更新: 788 -> 796 (内核 399040 B)
-  stage2.bin  : 2968 B  (上限 16384 B)
 [4/4] 生成磁盘镜像
   kernel 主副本: LBA 33..1056
   kernel 备副本: LBA 1057..2080

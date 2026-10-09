@@ -35,6 +35,10 @@ static i32  dg_gm_px = 2, dg_gm_py = 2;
 static i32  dg_gm_fx = 4, dg_gm_fy = 3;
 static u32  dg_gm_score = 0u;
 static u32  dg_gm_seed = 1u;
+static u32  dg_gm_mode = 0u;            /* 0收集 1=2048 */
+static u32  dg_g2048[16];               /* 2048 棋盘 */
+static u32  dg_2048_score = 0u;         /* 2048 分数 */
+static u32  dg_2048_over  = 0u;         /* 无空位=结束 */
 /* 照片查看器：当前图片索引 0-2 */
 static u32  dg_ph_idx = 0u;
 /* 秒表状态 */
@@ -672,24 +676,56 @@ static void dg_win_content(const dg_win_t *w)
             dg_text(bx, by + 150u, "S 秒表启停  R 复位  M 移动  N 最小化  Esc 关闭", gray, body);
             break;
         }
-    default: /* 游戏：5x5 收集小游戏 */
+    default: /* 游戏中心：1 收集  2 2048 */
         {
             i32 i, j;
             char nb[16];
-            dg_text(bx, by, "游戏中心 · 收集", fg, body);
-            /* 5x5 网格 */
-            for (j = 0; j < 5; j++) {
-                for (i = 0; i < 5; i++) {
-                    u32 cell_c = dg_rgb(0x28,0x34,0x42);
-                    if (i == dg_gm_px && j == dg_gm_py) cell_c = dg_rgb(0x30,0xC0,0x50);
-                    else if (i == dg_gm_fx && j == dg_gm_fy) cell_c = dg_rgb(0xE0,0xA0,0x30);
-                    dg_fill(bx + 8u + i * 22u, by + 26u + j * 22u, 18u, 18u, cell_c);
+            if (dg_gm_mode == 1u) {
+                /* 2048：4x4 棋盘 */
+                dg_text(bx, by, "2048 · " "1收集 2切换  Esc关闭", fg, body);
+                for (j = 0; j < 4; j++) {
+                    for (i = 0; i < 4; i++) {
+                        u32 v = dg_g2048[(u32)(j * 4 + i)];
+                        u32 cell_c = dg_rgb(0x28,0x34,0x42);
+                        if (v == 2u) cell_c = dg_rgb(0xE8,0xE0,0xB0);
+                        else if (v == 4u) cell_c = dg_rgb(0xE8,0xC8,0x90);
+                        else if (v == 8u) cell_c = dg_rgb(0xE8,0xA0,0x60);
+                        else if (v == 16u) cell_c = dg_rgb(0xE8,0x80,0x50);
+                        else if (v == 32u) cell_c = dg_rgb(0xE8,0x60,0x40);
+                        else if (v == 64u) cell_c = dg_rgb(0xE0,0x50,0x30);
+                        else if (v >= 128u) cell_c = dg_rgb(0xE8,0xC0,0x30);
+                        dg_fill(bx + 8u + i * 36u, by + 26u + j * 36u, 32u, 32u, cell_c);
+                        if (v) {
+                            nb[0] = (char)('0' + v / 100u);
+                            nb[1] = (char)('0' + (v % 100u) / 10u);
+                            nb[2] = (char)('0' + v % 10u);
+                            nb[3] = 0;
+                            dg_text(bx + 8u + i * 36u + 10u, by + 26u + j * 36u + 8u,
+                                    nb, dg_rgb(0x10,0x20,0x30), cell_c);
+                        }
+                    }
                 }
+                if (dg_2048_over) dg_text(bx + 8u, by + 172u, "GAME OVER (S 重开)", dg_rgb(0xE0,0x40,0x40), body);
+                nb[0] = 'S'; nb[1] = 'c'; nb[2] = 'o'; nb[3] = 'r'; nb[4] = 'e'; nb[5] = ':';
+                dg_itoa((int)dg_2048_score, nb + 6);
+                dg_text(bx + 8u, by + 132u, nb, dg_rgb(0xE8,0xC0,0x30), body);
+                dg_text(bx, by + 152u, "方向键移动  S重开  Esc关闭", gray, body);
+            } else {
+                /* 收集：5x5 */
+                dg_text(bx, by, "收集 · " "2切2048  Esc关闭", fg, body);
+                for (j = 0; j < 5; j++) {
+                    for (i = 0; i < 5; i++) {
+                        u32 cell_c = dg_rgb(0x28,0x34,0x42);
+                        if (i == dg_gm_px && j == dg_gm_py) cell_c = dg_rgb(0x30,0xC0,0x50);
+                        else if (i == dg_gm_fx && j == dg_gm_fy) cell_c = dg_rgb(0xE0,0xA0,0x30);
+                        dg_fill(bx + 8u + i * 22u, by + 26u + j * 22u, 18u, 18u, cell_c);
+                    }
+                }
+                nb[0] = 'S'; nb[1] = 'c'; nb[2] = 'o'; nb[3] = 'r'; nb[4] = 'e'; nb[5] = ':';
+                dg_itoa((int)dg_gm_score, nb + 6);
+                dg_text(bx + 8u, by + 132u, nb, dg_rgb(0x30,0xC0,0x50), body);
+                dg_text(bx, by + 152u, "方向键移动 Enter收集 S重置 Esc关闭", gray, body);
             }
-            nb[0] = 'S'; nb[1] = 'c'; nb[2] = 'o'; nb[3] = 'r'; nb[4] = 'e'; nb[5] = ':';
-            dg_itoa((int)dg_gm_score, nb + 6);
-            dg_text(bx + 8u, by + 132u, nb, dg_rgb(0x30,0xC0,0x50), body);
-            dg_text(bx, by + 152u, "方向键移动 Enter收集 S重置 Esc关闭", gray, body);
             break;
         }
         break;
@@ -1159,6 +1195,68 @@ static void dg_browser_input(dg_win_t *w, u32 key)
 }
 
 /* 打开一个窗口（找到空闲槽，位置级联偏移） */
+/* --- 2048 游戏逻辑 --- */
+static void g2048_reset(void)
+{
+    u32 i;
+    for (i = 0u; i < 16u; i++) dg_g2048[i] = 0u;
+    dg_2048_score = 0u; dg_2048_over = 0u;
+    dg_g2048[(u32)(dg_rand() % 16u)] = 2u;
+}
+
+static u32 g2048_empty(void)
+{
+    u32 i, n = 0u;
+    for (i = 0u; i < 16u; i++) if (dg_g2048[i] == 0u) n++;
+    return n;
+}
+
+static void g2048_spawn(void)
+{
+    u32 e = g2048_empty(), idx, k;
+    if (!e) { dg_2048_over = 1u; return; }
+    idx = (u32)(dg_rand() % e);
+    k = 0u;
+    for (k = 0u; k < 16u; k++) {
+        if (dg_g2048[k] == 0u) {
+            if (idx == 0u) { dg_g2048[k] = (dg_rand() % 4u == 0u) ? 4u : 2u; break; }
+            idx--;
+        }
+    }
+}
+
+/* dir: 0左 1右 2上 3下；返回是否移动 */
+static u32 g2048_move(u32 dir)
+{
+    u32 moved = 0u, r, c, a, b;
+    for (r = 0u; r < 4u; r++) {
+        u32 line[4], out[4], li = 0u, oi = 0u, i;
+        for (c = 0u; c < 4u; c++) {
+            u32 idx = (dir == 0u) ? r * 4u + c : (dir == 1u) ? r * 4u + (3u - c)
+                      : (dir == 2u) ? c * 4u + r : (3u - c) * 4u + r;
+            if (dg_g2048[idx]) line[li++] = dg_g2048[idx];
+        }
+        for (i = 0u; i < li; i++) {
+            if (i + 1u < li && line[i] == line[i + 1u]) {
+                out[oi++] = line[i] * 2u;
+                dg_2048_score += line[i] * 2u;
+                i++;
+            } else {
+                out[oi++] = line[i];
+            }
+        }
+        while (oi < 4u) out[oi++] = 0u;
+        for (c = 0u; c < 4u; c++) {
+            u32 idx = (dir == 0u) ? r * 4u + c : (dir == 1u) ? r * 4u + (3u - c)
+                      : (dir == 2u) ? c * 4u + r : (3u - c) * 4u + r;
+            if (dg_g2048[idx] != out[c]) moved = 1u;
+            dg_g2048[idx] = out[c];
+        }
+    }
+    if (moved) g2048_spawn();
+    return moved;
+}
+
 static void dg_win_open(u32 icon)
 {
     u32 i, slot = DG_WIN_MAX;
@@ -1425,28 +1523,39 @@ void desk_gui_run(void)
                 dg_render();
                 continue;
             }
-            /* 游戏窗口 */
+            /* 游戏中心 */
             if (w->icon == 7u) {
-                if (key == KEY_UP) {
-                    if (dg_gm_py > 0) dg_gm_py--;
-                } else if (key == KEY_DOWN) {
-                    if (dg_gm_py < 4) dg_gm_py++;
-                } else if (key == KEY_LEFT) {
-                    if (dg_gm_px > 0) dg_gm_px--;
-                } else if (key == KEY_RIGHT) {
-                    if (dg_gm_px < 4) dg_gm_px++;
-                } else if (key == KEY_ENTER) {
-                    if (dg_gm_px == dg_gm_fx && dg_gm_py == dg_gm_fy) {
-                        dg_gm_score++;
+                if (key == KEY_1 || key == KEY_2) {
+                    dg_gm_mode = (key == KEY_2) ? 1u : 0u;
+                } else if (dg_gm_mode == 1u) {
+                    if (key == KEY_UP) { g2048_move(2u); }
+                    else if (key == KEY_DOWN) { g2048_move(3u); }
+                    else if (key == KEY_LEFT) { g2048_move(0u); }
+                    else if (key == KEY_RIGHT) { g2048_move(1u); }
+                    else if (key == KEY_S) { g2048_reset(); }
+                } else {
+                    if (key == KEY_UP) {
+                        if (dg_gm_py > 0) dg_gm_py--;
+                    } else if (key == KEY_DOWN) {
+                        if (dg_gm_py < 4) dg_gm_py++;
+                    } else if (key == KEY_LEFT) {
+                        if (dg_gm_px > 0) dg_gm_px--;
+                    } else if (key == KEY_RIGHT) {
+                        if (dg_gm_px < 4) dg_gm_px++;
+                    } else if (key == KEY_ENTER) {
+                        if (dg_gm_px == dg_gm_fx && dg_gm_py == dg_gm_fy) {
+                            dg_gm_score++;
+                            dg_gm_fx = (i32)(dg_rand() % 5u);
+                            dg_gm_fy = (i32)(dg_rand() % 5u);
+                        }
+                    } else if (key == KEY_S) {
+                        dg_gm_score = 0u;
+                        dg_gm_px = 2; dg_gm_py = 2;
                         dg_gm_fx = (i32)(dg_rand() % 5u);
                         dg_gm_fy = (i32)(dg_rand() % 5u);
                     }
-                } else if (key == KEY_S) {
-                    dg_gm_score = 0u;
-                    dg_gm_px = 2; dg_gm_py = 2;
-                    dg_gm_fx = (i32)(dg_rand() % 5u);
-                    dg_gm_fy = (i32)(dg_rand() % 5u);
-                } else if (key == KEY_ESC) {
+                }
+                if (key == KEY_ESC) {
                     dg_win_close();
                 } else if (key == KEY_M) {
                     dg_move_mode = 1u;
