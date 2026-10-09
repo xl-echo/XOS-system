@@ -298,6 +298,9 @@ static u32  dg_menu    = DG_MENU_NONE;
 static u32  dg_wx_idx  = 0u;              /* 天气：0晴 1多云 2雨 3雪 */
 static u32  dg_set_page = 0u;            /* 设置中心页签：0概览 1驱动 2存储 3关于 */
 static u32  dg_mu_vol   = 60u;           /* 音乐音量 0-100 */
+static u32  dg_fm_dir  = 0u;            /* 文件管理器：0根 1/mnt 2/dev 3查看note */
+static u32  dg_fm_sel  = 0u;            /* 文件管理器高亮项 */
+static char dg_fm_note[40];             /* note.txt 内容缓存 */
 static u32  dg_menusel = 0u;
 
 static const char *dg_apps[DG_ICON_N] = {
@@ -326,22 +329,50 @@ static void dg_win_content(const dg_win_t *w)
     u32 gray = dg_rgb(0x60,0x60,0x60);
     u32 bx = w->x + 16u, by = w->y + 44u;
     switch (w->icon) {
-    case 0u: /* 文件管理器：真实列出根目录 */
+    case 0u: /* 文件管理器 v2：目录导航 + 查看 */
         {
             char nm[128];
             u32 di = 0u, ln = 0u;
-            dg_text(bx, by, "/ (root)", blue, body);
-            while (di < 64u) {
-                if (fs_readdir("/", di, nm) != 0) break;
-                if (nm[0] == 0) break;
-                dg_text(bx, by + 22u + ln * 22u, "  [F]", blue, body);
-                dg_text(bx + 34u, by + 22u + ln * 22u, nm, fg, body);
-                ln++;
-                di++;
-                if (ln >= 5u) break;
+            const char *title = "/ (root)";
+            const char *path = "/";
+            u32 n = 0u;
+            if (dg_fm_dir == 1u) { title = "/mnt"; path = "/mnt"; }
+            else if (dg_fm_dir == 2u) { title = "/dev"; path = "/dev"; }
+            else if (dg_fm_dir == 3u) { title = "note.txt"; }
+            dg_text(bx, by, title, blue, body);
+            if (dg_fm_dir == 3u) {
+                u32 j = 0u;
+                dg_text(bx + 4u, by + 24u, "note.txt 内容:", dg_rgb(0x1E,0x6F,0xD0), body);
+                while (dg_fm_note[j] && j < 39u) { dg_text(bx + 4u, by + 48u + (j / 30u) * 22u, dg_fm_note + j, fg, body); j += 30u; }
+                if (!dg_fm_note[0]) dg_text(bx + 4u, by + 48u, "(empty)", gray, body);
+            } else {
+                while (di < 64u) {
+                    if (fs_readdir(path, di, nm) != 0) break;
+                    if (nm[0] == 0) break;
+                    n++;
+                    dg_text(bx + 4u, by + 22u + ln * 22u,
+                            ln == dg_fm_sel ? " >" : "  ", dg_rgb(0xE8,0xA0,0x30), body);
+                    /* 尝试按文件打开：成功=文件，失败=目录 */
+                    {
+                        char fp[64];
+                        u32 j = 0u;
+                        const char *base = (dg_fm_dir == 1u) ? "/mnt/" : (dg_fm_dir == 2u) ? "/dev/" : "/";
+                        while (base[j]) { fp[j] = base[j]; j++; }
+                        { u32 k = 0u; while (nm[k] && j + k < 60u) { fp[j + k] = nm[k]; k++; } fp[j + k] = 0; }
+                        if (fs_open(fp, O_READ) >= 0) {
+                            dg_text(bx + 12u, by + 22u + ln * 22u, "[F]", dg_rgb(0x2A,0x8A,0x3A), body);
+                        } else {
+                            dg_text(bx + 12u, by + 22u + ln * 22u, "[D]", dg_rgb(0x1E,0x6F,0xD0), body);
+                        }
+                    }
+                    dg_text(bx + 30u, by + 22u + ln * 22u, nm, fg, body);
+                    ln++;
+                    di++;
+                    if (ln >= 5u) break;
+                }
+                if (!ln) dg_text(bx, by + 22u, "(empty)", gray, body);
             }
-            if (!ln) dg_text(bx, by + 22u, "(empty)", gray, body);
-            dg_text(bx, by + 132u, "M 移动  N 最小化  W 切换  Esc 关闭", gray, body);
+            dg_text(bx, by + 132u, "Enter进入/查看  Backspace返回  Esc关闭  M移动", gray, body);
         }
         break;
     case 1u: /* 文本编辑器：真实输入 + 保存到 /note.txt + 历史回读（打开时预读） */
@@ -1307,6 +1338,38 @@ void desk_gui_run(void)
                     dg_move_mode = 1u;
                 } else if (key == KEY_1 || key == KEY_2 || key == KEY_3) {
                     dg_ph_idx = key - KEY_1;
+                }
+                dg_render();
+                continue;
+            }
+            /* 文件管理器：Enter/Backspace 导航 */
+            if (w->icon == 0u) {
+                if (key == KEY_ESC) {
+                    dg_win_close();
+                } else if (key == KEY_M) {
+                    dg_move_mode = 1u;
+                } else if (key == KEY_DOWN || key == KEY_TAB) {
+                    if (dg_fm_sel < 2u) dg_fm_sel++;
+                } else if (key == KEY_UP) {
+                    if (dg_fm_sel > 0u) dg_fm_sel--;
+                } else if (key == KEY_BACKSP) {
+                    if (dg_fm_dir == 1u || dg_fm_dir == 2u) dg_fm_dir = 0u;
+                    else if (dg_fm_dir == 3u) dg_fm_dir = 0u;
+                    dg_fm_sel = 0u;
+                } else if (key == KEY_ENTER) {
+                    if (dg_fm_dir == 0u) {
+                        if (dg_fm_sel == 0u) dg_fm_dir = 1u;      /* /mnt */
+                        else if (dg_fm_sel == 1u) dg_fm_dir = 2u; /* /dev */
+                        else {                                     /* note.txt 查看 */
+                            int fd = fs_open("/note.txt", O_READ);
+                            u32 rd = 0u, j;
+                            if (fd >= 0) { rd = (u32)fs_read(fd, dg_fm_note, 39u); fs_close(fd); }
+                            dg_fm_note[rd] = 0;
+                            for (j = 0u; j < 39u; j++) if (dg_fm_note[j] == '\n') dg_fm_note[j] = ' ';
+                            dg_fm_dir = 3u;
+                        }
+                        dg_fm_sel = 0u;
+                    }
                 }
                 dg_render();
                 continue;
