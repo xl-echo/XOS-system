@@ -30,7 +30,7 @@
 
 .equ KERNEL_SEG,   0x1000        /* 0x1000:0x0000 = 0x10000 */
 .equ KERNEL_LBA,   33
-.equ KERNEL_SECS,  804           /* 自动同步：内核 403136 B -> 804 扇区 */           /* 自动同步：内核 399040 B -> 796 扇区 */           /* 自动同步：内核 394940 B -> 788 扇区 */           /* 自动同步：内核 390844 B -> 780 扇区 */           /* 自动同步：内核 386748 B -> 772 扇区 */           /* 自动同步：内核 382652 B -> 764 扇区 */           /* 自动同步：内核 378556 B -> 756 扇区 */           /* 自动同步：内核 374440 B -> 748 扇区 */           /* 自动同步：内核 370344 B -> 740 扇区 */           /* 自动同步：内核 366248 B -> 732 扇区 */           /* 自动同步：内核 362152 B -> 724 扇区 */           /* 自动同步：内核 358024 B -> 716 扇区 */           /* 自动同步：内核 353928 B -> 708 扇区 */           /* 当前内核 692 扇区(353928B)+余量；build.py 会在内核扩容时自动同步此值 */
+.equ KERNEL_SECS,  1100           /* 自动同步：内核 554692 B -> 1100 扇区 */           /* 自动同步：内核 558788 B -> 1108 扇区 */           /* 自动同步：内核 554692 B -> 1100 扇区 */           /* 自动同步：内核 1017540 B -> 2004 扇区 */           /* 自动同步：内核 403136 B -> 804 扇区 */           /* 自动同步：内核 399040 B -> 796 扇区 */           /* 自动同步：内核 394940 B -> 788 扇区 */           /* 自动同步：内核 390844 B -> 780 扇区 */           /* 自动同步：内核 386748 B -> 772 扇区 */           /* 自动同步：内核 382652 B -> 764 扇区 */           /* 自动同步：内核 378556 B -> 756 扇区 */           /* 自动同步：内核 374440 B -> 748 扇区 */           /* 自动同步：内核 370344 B -> 740 扇区 */           /* 自动同步：内核 366248 B -> 732 扇区 */           /* 自动同步：内核 362152 B -> 724 扇区 */           /* 自动同步：内核 358024 B -> 716 扇区 */           /* 自动同步：内核 353928 B -> 708 扇区 */           /* 当前内核 692 扇区(353928B)+余量；build.py 会在内核扩容时自动同步此值 */
 .equ BKUP_LBA,     1057          /* 备用内核副本 LBA（与 build.py BKUP_LBA 一致），签名损坏时回退 */
 .equ CHUNK_SECS,   32
 .equ MAX_RETRY,    3
@@ -60,9 +60,10 @@
 /* 引导配置块 0x0D40（16B）：magic 'CFG1' + u8 超时秒 + u8 默认项 + u8 本次选择 + pad + u32 选择时刻 tick */
 .equ CFG_BASE,    0x0D40
 .equ CFG_MAGIC,   0x31474643      /* 'CFG1' */
-.equ MENU_TIMEOUT, 5              /* 默认 5 秒超时 */
+.equ MENU_TIMEOUT, 5              /* 默认 5 秒超时（配置块记录） */
 .equ MENU_DEFAULT, 1              /* 默认引导项 1 = 主副本 */
 .equ MENU_CH_BKUP, 2              /* 选择项 2 = 强制备用副本 */
+.equ MENU_TICKS,   0x8000         /* 菜单纯循环超时计数（~1-2s，不依赖 BIOS tick） */
 
 /* 保护模式阶段：页目录基址 0x6000（低内存空闲区，4KB，1024 项 4MB 大页 identity map） */
 .equ PGT_BASE,    0x6000
@@ -180,6 +181,8 @@ _start:
     call    log_event
 
     /* ---- 7) 校验内核签名，失败则回退到备用副本 ---- */
+    movb    $'V', %al
+    call    serial_putc
     call    verify_kernel
     testw   %ax, %ax
     jnz     .kern_ok
@@ -198,8 +201,14 @@ _start:
     movw    $8, %ax
     movw    $0, %bx
     call    log_event
+    movb    $'S', %al
+    call    serial_putc
     call    print_summary
+    movb    $'L', %al
+    call    serial_putc
     call    dump_log
+    movb    $'X', %al
+    call    serial_putc
     call    print_stats
 
     /* ---- 8) 进入保护模式 ---- */
@@ -211,6 +220,8 @@ _start:
     call    stat_store
 
     cli
+    movb    $'P', %al
+    call    serial_putc
     lgdt    gdt_desc
     movl    %cr0, %eax
     orl     $0x00000001, %eax
@@ -557,10 +568,12 @@ stat_store:
  * print_summary：把统计结果打到屏幕与串口
  * =========================================================================== */
 /* ===========================================================================
- * boot_menu：引导菜单与超时（键盘 INT16h + BIOS tick）
- * 流程：打印提示 → 建配置块(0x0D40) → 取起点 tick → 轮询按键：
- *   '1'=主副本(默认) '2'=强制备用副本 '3'=打印内存信息后走默认
- *   其余键/超时(5s)=默认；结果写 cfg_choose 与配置块
+ * boot_menu：引导菜单与超时（8042 端口轮询 + 纯循环超时）
+ * 流程：打印提示 → 建配置块(0x0D40) → 轮询键盘控制器端口 0x64/0x60：
+ *   '1'(0x02)=主副本(默认) '2'(0x03)=强制备用副本 '3'(0x04)=打印内存信息后走默认
+ *   其余键/超时(~2s 纯循环)=默认；结果写 cfg_choose 与配置块
+ *   注：不依赖 BIOS INT16h/INT8（headless 下中断可能未驱动导致永久等待），
+ *       直接读 8042 端口 + 指令循环计数。
  * =========================================================================== */
 boot_menu:
     pusha
@@ -573,20 +586,19 @@ boot_menu:
     movb    $MENU_TIMEOUT, 1(%di)
     movb    $MENU_DEFAULT, 2(%di)
     movb    $MENU_DEFAULT, 3(%di)
-    movw    $0x0040, %ax
-    movw    %ax, %es
-    movw    %es:0x6C, %bx
+    movw    $MENU_TICKS, %cx
+    movb    $'M', %al
+    call    serial_putc
 .menu_wait:
-    movb    $0x01, %ah
-    int     $0x16
+    inb     $0x64, %al
+    testb   $0x01, %al
     jz      .menu_tick
-    movb    $0x00, %ah
-    int     $0x16
-    cmpb    $'1', %al
+    inb     $0x60, %al
+    cmpb    $0x02, %al
     je      .menu_pick1
-    cmpb    $'2', %al
+    cmpb    $0x03, %al
     je      .menu_pick2
-    cmpb    $'3', %al
+    cmpb    $0x04, %al
     je      .menu_pick3
     jmp     .menu_timeout
 .menu_pick1:
@@ -601,19 +613,21 @@ boot_menu:
     jmp     .menu_timeout
 .menu_set:
     movb    %al, 3(%di)
+    movb    $'K', %al
+    call    serial_putc
     jmp     .menu_done
 .menu_tick:
-    movw    %es:0x6C, %ax
-    subw    %bx, %ax
-    cmpw    $92, %ax
-    jb      .menu_wait
+    decw    %cx
+    jnz     .menu_wait
+    movb    $'T', %al
+    call    serial_putc
 .menu_timeout:
     movb    $MENU_DEFAULT, 3(%di)
 .menu_done:
     movb    3(%di), %al
     movb    %al, cfg_choose
-    movw    %es:0x6C, %ax
-    movw    %ax, 6(%di)
+    movb    $'D', %al
+    call    serial_putc
     movw    $msg_mdone, %si
     call    puts_dual
     movzbl  cfg_choose, %eax
@@ -1192,6 +1206,8 @@ load_kernel:
     movw    $MAX_RETRY, %bp
 
 .lk_restart:
+    movb    $'K', %al
+    call    serial_putc
     movw    $KERNEL_SEG, %ax
     movw    %ax, %es
     xorw    %bx, %bx
@@ -1205,6 +1221,7 @@ load_kernel:
     jbe     1f
     movw    $CHUNK_SECS, %ax
 1:
+    pushw   %ax
     movw    %ax, dap_k_count
     movw    %bx, dap_k_off
     movw    %es, dap_k_seg
@@ -1215,6 +1232,11 @@ load_kernel:
     int     $0x13
     jnc     2f
 
+    popw    %ax
+    movw    %ax, %di
+    movb    $'x', %al
+    call    serial_putc
+    movw    %di, %ax
     pushw   %ax
     xorw    %ax, %ax
     movb    boot_drive, %dl
@@ -1224,22 +1246,26 @@ load_kernel:
     jnz     .lk_restart
     jmp     .lk_err
 2:
-    movw    dap_k_count, %ax
+    popw    %ax
+    movw    %ax, %di
+    movb    $'o', %al
+    call    serial_putc
+    movw    %di, %ax
     subw    %ax, %cx
 
-    movw    dap_k_count, %ax
     shlw    $5, %ax
     movw    %es, %dx
     addw    %ax, %dx
     movw    %dx, %es
 
     movl    dap_k_lba, %eax
-    movzwl  dap_k_count, %edx
+    movzwl  %di, %edx
     addl    %edx, %eax
     movl    %eax, dap_k_lba
-
     testw   %cx, %cx
     jnz     .lk_loop
+    movb    $'R', %al
+    call    serial_putc
     popa
     ret
 

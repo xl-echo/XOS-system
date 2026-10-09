@@ -13,6 +13,7 @@
 #include "multiuser.h"
 #include "display.h"
 #include "string.h"
+#include "xos_loginbg.h"
 
 #define LG_NAME_LEN   15u
 #define LG_PASS_LEN   31u
@@ -74,7 +75,7 @@ static u32 lg_remaining(void)
 static void lg_draw(void)
 {
     u32 first = (lg_flags & LG_FIRST) ? 1u : 0u;
-    u32 y, i;
+    u32 y, x, i;
     u32 bg = dg_rgb(0x10, 0x1E, 0x34);
     u32 panel = dg_rgb(0x1C, 0x2A, 0x40);
     u32 title = dg_rgb(0x8A, 0xC8, 0xFF);
@@ -84,10 +85,13 @@ static void lg_draw(void)
     u32 box_h = dg_rgb(0x50, 0x90, 0xD0);
     u32 dim = dg_rgb(0x90, 0xA0, 0xB8);
 
-    /* 背景渐变 */
+    /* 设计稿登录背景（320x240 拉伸） */
     for (y = 0u; y < DG_H; y++) {
-        u32 f = (y * 120u) / DG_H;
-        dg_fill(0u, y, DG_W, 1u, dg_rgb(0x10u + f / 8u, 0x1Eu + f / 6u, 0x34u + f / 4u));
+        u32 wy = (y * 120u) / DG_H;
+        for (x = 0u; x < DG_W; x++) {
+            u32 wx = (x * 160u) / DG_W;
+            dg_fb[y * DG_W + x] = xos_loginbg[wy * 160u + wx];
+        }
     }
     /* 面板 */
     dg_fill(80u, 60u, 480u, 330u, panel);

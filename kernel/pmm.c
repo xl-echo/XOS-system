@@ -89,7 +89,7 @@ u32 pmm_lock_enter_count(void) { return pmm_lock_calls; }
  * 保守保留到 0x80000（共 448KB），确保内核代码段、静态数据、位图
  * 与 .bss（随堆分配器等模块增长）不会被页分配器回收。 */
 #define KERNEL_RESERVE_BASE  0x00010000u
-#define KERNEL_RESERVE_END   0x00140000u   /* 含 .bss（已移至 0x100000 起，见 linker.ld）；防止堆分配踩入内核数据 */
+#define KERNEL_RESERVE_END   0x00300000u   /* 含 .bss（固定 0x200000 起，见 linker.ld）；防止堆分配踩入内核数据 */
 
 /* ---- 扩展子系统常量（定义在此处，供 pmm_stats 等前置函数使用） ---- */
 #define ZONE_DMA        0

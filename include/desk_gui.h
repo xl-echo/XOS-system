@@ -20,6 +20,7 @@ extern u32 dg_welcome;
 
 /* 渲染原语（供登录界面等图形模块复用） */
 u32  dg_rgb(u32 r, u32 g, u32 b);
+extern volatile u32 *dg_fb;
 void dg_fill(u32 x, u32 y, u32 w, u32 h, u32 color);
 void dg_rect(u32 x, u32 y, u32 w, u32 h, u32 color);
 void dg_text(u32 x, u32 y, const char *s, u32 fg, u32 bg);

@@ -19,11 +19,12 @@
 #include "pmm.h"
 #include "task.h"
 #include "sound.h"
+#include "xos_wallpaper.h"
 
 extern void *memset(void *dst, int c, unsigned int n);
 
 /* ---------------- 32bpp 帧缓冲访问 ---------------- */
-static volatile u32 *dg_fb = (volatile u32 *)DG_LFB;
+volatile u32 *dg_fb = (volatile u32 *)DG_LFB;
 static u32 dg_sel = 0u;
 static void dg_itoa(int v, char *out);
 
@@ -868,24 +869,14 @@ static void dg_render(void)
     u32 sec, hh, mm;
     char tbuf[16];
 
-    /* 1) 渐变壁纸：顶部深蓝 → 底部深灰 */
-    for (y = 0; y < DG_H - DG_TASKBAR; y++) {
-        u32 f = (y * 160u) / (DG_H - DG_TASKBAR);
-        u32 r = 0x10u + (f * 0x08u) / 0x100u;
-        u32 g = 0x20u + (f * 0x06u) / 0x100u;
-        u32 b = 0x40u + (f * 0x18u) / 0x100u;
-        dg_fill(0u, y, DG_W, 1u, dg_rgb(r, g, b));
+    /* 1) 设计稿壁纸：XOS 1.0 桌面主界面（320x240 拉伸） */
+    for (y = 0u; y < DG_H - DG_TASKBAR; y++) {
+        u32 wy = (y * 120u) / (DG_H - DG_TASKBAR);
+        for (x = 0u; x < DG_W; x++) {
+            u32 wx = (x * 160u) / DG_W;
+            dg_fb[y * DG_W + x] = xos_wallpaper[wy * 160u + wx];
+        }
     }
-    /* 1.5) 像素风景：太阳 / 云 / 远山 / 近地 */
-    dg_fill(496u, 34u, 30u, 30u, dg_rgb(0xF0,0xC0,0x40));            /* 太阳 */
-    dg_fill(66u, 62u, 36u, 10u, dg_rgb(0xE8,0xF0,0xF8));            /* 云 1 */
-    dg_fill(78u, 54u, 22u, 8u, dg_rgb(0xE8,0xF0,0xF8));
-    dg_fill(412u, 130u, 40u, 10u, dg_rgb(0xD8,0xE4,0xF0));          /* 云 2 */
-    dg_fill(424u, 122u, 24u, 8u, dg_rgb(0xD8,0xE4,0xF0));
-    dg_fill(0u, 300u, 240u, 60u, dg_rgb(0x2A,0x38,0x58));           /* 远山 */
-    dg_fill(150u, 322u, 270u, 38u, dg_rgb(0x22,0x30,0x50));
-    dg_fill(370u, 292u, 270u, 68u, dg_rgb(0x2E,0x3C,0x60));
-    dg_fill(0u, 356u, DG_W, 64u, dg_rgb(0x14,0x2A,0x1E));           /* 近地 */
 
     /* 2) 图标：两行五列（窗口打开时仍可见，除被窗口遮挡外） */
     for (i = 0; i < DG_ICON_N; i++) {

@@ -60,7 +60,7 @@ extern u8 __bss_start[];
 extern u8 __bss_end[];
 
 /* 与 pmm.c 保持一致的内核保留区上界 */
-#define KERNEL_RESERVE_END_CHECK  0x00140000u   /* .bss 已移至 0x100000 起（linker.ld），检查上限含 .bss 余量 0x140000 */
+#define KERNEL_RESERVE_END_CHECK  0x00300000u   /* .bss 固定 0x200000 起（linker.ld），检查上限含 .bss 余量 0x300000 */
 
 static u32 tests_run    = 0;
 static u32 tests_failed = 0;
@@ -450,7 +450,7 @@ void kmain(void)
 {
     static mem_stats_t st;
     static u32 rc;
-    static u32 kend;
+    u32 kend = 0;
 
     con_init();
     print_banner();
@@ -482,6 +482,12 @@ void kmain(void)
      * ================================================================== */
     section("[3/7] Verifying kernel footprint...\n");
     kend = (u32)__bss_end;
+    con_puts("  bss_end sym: ");
+    con_put_hex32((u32)__bss_end);
+    con_putc('\n');
+    con_puts("  kend var   : ");
+    con_put_hex32(kend);
+    con_putc('\n');
     con_puts("  Kernel image + .bss end : ");
     con_put_hex32(kend);
     con_puts("   limit ");

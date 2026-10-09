@@ -33,9 +33,9 @@ BUILD = os.path.join(ROOT, 'build')
 
 IMG_SIZE = 10 * 1024 * 1024
 STAGE2_SECTORS = 32
-KERNEL_SECTORS = 1024         # 内核扩容至 1024*512=524288B（为第二期应用层开发预留）
+KERNEL_SECTORS = 4096        # 内核扩容至 4096*512=2097152B（.bss 固定 0x200000 起，flat 镜像含空洞）
 KERNEL_LBA = 33          # 内核主副本起始 LBA
-BKUP_LBA = 1057          # 内核备用副本起始 LBA (KERNEL_LBA + KERNEL_SECTORS)
+BKUP_LBA = 3105          # 内核备用副本起始 LBA (KERNEL_LBA + KERNEL_SECTORS)
 BKUP_SECTORS = KERNEL_SECTORS
 
 # ---- MBR 分区表参数 ----------------------------------------------------
@@ -276,7 +276,7 @@ def ensure_stage2_kernel_secs(kernel_bin):
     if cur is None:
         print('[WARN] stage2.S 未找到 KERNEL_SECS 定义，跳过自动同步')
         return None
-    if need <= cur:
+    if need == cur:
         return None
     src2 = re.sub(r'\.equ KERNEL_SECS,\s*\d+',
                   r'.equ KERNEL_SECS,  %d           /* 自动同步：内核 %d B -> %d 扇区 */' % (need, size, need),

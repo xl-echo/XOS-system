@@ -4,41 +4,43 @@ XOS 构建开始
 [1/4] 构建 MBR
   boot.bin    : 512 B  (OK)
   代码占用    : 430 B / 444 B (余 14 B)
-  分区表      : 1 活动项(类型 0x7f, LBA 1, 2080 扇区) + 3 空项
+  分区表      : 1 活动项(类型 0x7f, LBA 1, 8224 扇区) + 3 空项
   引导签名    : 55 AA (OK)
   完整性校验值: 0xbefe (覆盖 0..443)
   完整性回读  : 0xbefe == 0xbefe (OK)
 [2/4] 构建 Stage2
-  stage2.bin  : 2968 B  (上限 16384 B)
+  stage2.bin  : 3016 B  (上限 16384 B)
 [3/4] 构建内核
   [warn] D:\��ϵͳ���������ĵ�\��Ŀ����\xos\kernel\login.c:33:13: warning: 'g_poll_fb' defined but not used [-Wunused-variable]
    33 | static u32  g_poll_fb;
       |             ^~~~~~~~~
   [warn] D:\��ϵͳ���������ĵ�\��Ŀ����\xos\kernel\login_gui.c: In function 'lg_remaining':
-D:\��ϵͳ���������ĵ�\��Ŀ����\xos\kernel\login_gui.c:69:19: warning: implicit declaration of function 'pit_tick_count' [-Wimplicit-function-declaration]
-   69 |         u32 el = (pit_tick_count() - lg_locked_tick) / 100u;
+D:\��ϵͳ���������ĵ�\��Ŀ����\xos\kernel\login_gui.c:70:19: warning: implicit declaration of function 'pit_tick_count' [-Wimplicit-function-declaration]
+   70 |         u32 el = (pit_tick_count() - lg_locked_tick) / 100u;
       |                   ^~~~~~~~~~~~~~
 D:\��ϵͳ���������ĵ�\��Ŀ����\xos\kernel\login_gui.c: In function 'lg_draw':
-D:\��ϵͳ���������ĵ�\��Ŀ����\xos\kernel\login_gui.c:78:9: warning: unused variable 'bg' [-Wunused-variable]
-   78 |     u32 bg = dg_rgb(0x10, 0x1E, 0x34);
+D:\��ϵͳ���������ĵ�\��Ŀ����\xos\kernel\login_gui.c:79:9: warning: unused variable 'bg' [-Wunused-variable]
+   79 |     u32 bg = dg_rgb(0x10, 0x1E, 0x34);
       |         ^~
 D:\��ϵͳ��������
   [warn] D:\��ϵͳ���������ĵ�\��Ŀ����\xos\kernel\desk_gui.c: In function 'dg_browser_input':
-D:\��ϵͳ���������ĵ�\��Ŀ����\xos\kernel\desk_gui.c:1302:13: warning: unused variable 'i' [-Wunused-variable]
- 1302 |         u32 i = 0u;
+D:\��ϵͳ���������ĵ�\��Ŀ����\xos\kernel\desk_gui.c:1293:13: warning: unused variable 'i' [-Wunused-variable]
+ 1293 |         u32 i = 0u;
       |             ^
 D:\��ϵͳ���������ĵ�\��Ŀ����\xos\kernel\desk_gui.c: In function 'g2048_move':
-D:\��ϵͳ���������ĵ�\��Ŀ����\xos\kernel\desk_gui.c:1351:30: warning: unused variable 'b' [-Wunused-variable]
- 1351 |     u32 moved = 0u, r, c, a, b;
+D:\��ϵͳ���������ĵ�\��Ŀ����\xos\kernel\desk_gui.c:1342:30: warning: unused variable 'b' [-Wunused-variable]
+ 1342 |     u32 moved = 0u, r, c, a, b;
       |                              ^
-D:\��ϵͳ���������ĵ�\��Ŀ����\xos\kernel\desk_gui.c:1351:27: warning: unused variable 'a' [-Wunused-va
-  kernel.bin  : 403136 B  (上限 524288 B)
+D:\��ϵͳ���������ĵ�\��Ŀ����\xos\kernel\desk_gui.c:1342:27: warning: unused variable 'a' [-Wunused-va
+  kernel.bin  : 554692 B  (上限 2097152 B)
   size        : text	   data	    bss	    dec	    hex	filename
-  size        :  400292	    576	 236640	 637508	  9ba44	D:\��ϵͳ���������ĵ�\��Ŀ����\xos\build\kernel.pe
+  size        :  553620	    580	 236608	 790808	  c1118	D:\��ϵͳ���������ĵ�\��Ŀ����\xos\build\kernel.pe
 [3.5/4] 同步 Stage2 KERNEL_SECS（内核扩容自动更新引导加载扇区数）
+  stage2.S KERNEL_SECS 自动更新: 1108 -> 1100 (内核 554692 B)
+  stage2.bin  : 3016 B  (上限 16384 B)
 [4/4] 生成磁盘镜像
-  kernel 主副本: LBA 33..1056
-  kernel 备副本: LBA 1057..2080
+  kernel 主副本: LBA 33..4128
+  kernel 备副本: LBA 3105..7200
   xos.img     : 10485760 B  (10 MB)
 ============================================================
 构建成功

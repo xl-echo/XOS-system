@@ -23,12 +23,11 @@ SECTIONS
         *(.data.*)
     }
 
-    /* 大 .bss（位图/索引/堆等）不得落在 0xA0000-0xBFFFF VGA/BIOS 保留区：
-     * 原布局 .bss 终点 0xA0520 已越界，static 变量写 VGA 区读回垃圾。
-     * 将 .bss 整体移至 1MB 之上的常规 RAM（0x100000 起），
-     * 由 pmm 保留 [0x100000, 0x140000)；flat 镜像不含 .bss（NOBITS），
-     * stage2 按 __bss_start/__bss_end 清零。 */
-    . = 0x100000;
+    /* .bss 固定定位到 0x200000：避开 0xA0000-0xC0000 VGA/ROM 区（此前
+     * .bss 从 0x98000 增长会跨入显存区，memset 写显存导致启动卡死）。
+     * pmm 保留 [0x10000, 0x300000) 覆盖 .text/.rodata/.data/.bss 全区。
+     * flat 镜像不含 .bss（NOBITS），stage2 按 __bss_start/__bss_end 清零。 */
+    . = 0x200000;
     PROVIDE(__bss_start = .);
     PROVIDE(___bss_start = .);
     .bss : {
