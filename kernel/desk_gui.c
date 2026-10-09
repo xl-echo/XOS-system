@@ -707,6 +707,32 @@ static void dg_win_content(const dg_win_t *w)
             } else {
                 dg_text(bx + 10u, by + 112u, "闹钟: 未设定 (A 设置)", gray, body);
             }
+            /* 日历视图：仅 2x/3x 大窗口显示（1x 无空间） */
+            if (w->h > 260u) {
+                u32 i2, j2, d, cx, cy;
+                const char *wk = "一 二 三 四 五 六 日";
+                dg_text(bx + 8u, by + dy6 - 16u, wk, dg_rgb(0xC8,0xD8,0xE8), body);
+                for (j2 = 0u; j2 < 5u; j2++) {
+                    for (i2 = 0u; i2 < 7u; i2++) {
+                        char cb[4];
+                        u32 col;
+                        d = (u32)(j2 * 7u + i2) + 1u - 3u;      /* 10/1=周四(列3) */
+                        cx = bx + 8u + i2 * 16u;
+                        cy = by + dy6 + j2 * 16u;
+                        if (d >= 1u && d <= 31u) {
+                            col = (d == 9u) ? dg_rgb(0x2F,0x7D,0xE1) : dg_rgb(0x24,0x30,0x40);
+                            dg_fill(cx, cy, 14u, 14u, col);
+                            cb[0] = (char)('0' + d / 10u);
+                            cb[1] = (char)('0' + d % 10u);
+                            cb[2] = 0;
+                            dg_text(cx + 1u, cy + 1u, cb, dg_rgb(0xE0,0xE0,0xE0), col);
+                        }
+                    }
+                }
+                dg_text(bx + 8u, by + dy6 + 84u, "● 今天", dg_rgb(0x2F,0x7D,0xE1), body);
+            } else {
+                dg_text(bx + 8u, by + dy6, "(G 放大窗口查看日历)", gray, body);
+            }
             dg_text(bx, by + dy7, "S秒表 R复位 A闹钟 M移动 N最小化 Esc关闭", gray, body);
             break;
         }
