@@ -35,6 +35,10 @@ static u32  dg_gm_score = 0u;
 static u32  dg_gm_seed = 1u;
 /* 照片查看器：当前图片索引 0-2 */
 static u32  dg_ph_idx = 0u;
+/* 秒表状态 */
+static u32  dg_st_running = 0u;
+static u32  dg_st_start   = 0u;
+static u32  dg_st_total   = 0u;
 
 u32 dg_welcome = 0u;                 /* 首次使用欢迎向导 */
 
@@ -489,8 +493,25 @@ static void dg_win_content(const dg_win_t *w)
             dg_fill(bx + 8u, by + 30u, dg_text_w(nb) * 2u, 24u, dg_rgb(0x1E,0x3A,0x5F));
             dg_text(bx + 10u, by + 34u, nb, dg_rgb(0xF0,0xF0,0xF0), dg_rgb(0x1E,0x3A,0x5F));
             dg_text(bx + 10u, by + 66u, "2026年10月9日  星期五", fg, body);
-            dg_text(bx + 10u, by + 88u, "系统运行中 · XOS 0.3.0", gray, body);
-            dg_text(bx, by + 150u, "M 移动  N 最小化  W 切换  Esc 关闭", gray, body);
+            /* 秒表 */
+            {
+                u32 st = dg_st_running ? (pit_tick_count() - dg_st_start) / 100u
+                                       : dg_st_total;
+                u32 sm, ss;
+                char sb[24];
+                sm = st / 60u; ss = st % 60u;
+                sb[0] = 'S'; sb[1] = 't'; sb[2] = 'o'; sb[3] = 'p';
+                sb[4] = 'w'; sb[5] = 'a'; sb[6] = 't'; sb[7] = 'c'; sb[8] = 'h';
+                sb[9] = ':'; sb[10] = ' ';
+                sb[11] = (char)('0' + sm / 10u); sb[12] = (char)('0' + sm % 10u);
+                sb[13] = ':'; sb[14] = (char)('0' + ss / 10u); sb[15] = (char)('0' + ss % 10u);
+                sb[16] = 0;
+                dg_text(bx + 10u, by + 88u, sb, dg_rgb(0x30,0xC0,0x50), body);
+                dg_text(bx + 110u, by + 88u, dg_st_running ? "●运行中" : "○已停止",
+                        dg_st_running ? dg_rgb(0x30,0xC0,0x50) : gray, body);
+            }
+            dg_text(bx + 10u, by + 112u, "系统运行中 · XOS 0.3.0", gray, body);
+            dg_text(bx, by + 150u, "S 秒表启停  R 复位  M 移动  N 最小化  Esc 关闭", gray, body);
             break;
         }
     default: /* 游戏：5x5 收集小游戏 */
@@ -1078,6 +1099,27 @@ void desk_gui_run(void)
                     if (w->y + w->h + 4u < DG_H - DG_TASKBAR) w->y += 10u;
                 } else if (key == KEY_ENTER || key == KEY_ESC || key == KEY_M) {
                     dg_move_mode = 0u;                       /* 结束移动 */
+                }
+                dg_render();
+                continue;
+            }
+            /* 时钟日历：S 秒表启停  R 复位 */
+            if (w->icon == 9u) {
+                if (key == KEY_ESC) {
+                    dg_win_close();
+                } else if (key == KEY_M) {
+                    dg_move_mode = 1u;
+                } else if (key == KEY_S) {
+                    if (dg_st_running) {
+                        dg_st_total += (pit_tick_count() - dg_st_start) / 100u;
+                        dg_st_running = 0u;
+                    } else {
+                        dg_st_start = pit_tick_count();
+                        dg_st_running = 1u;
+                    }
+                } else if (key == KEY_R) {
+                    dg_st_running = 0u;
+                    dg_st_total = 0u;
                 }
                 dg_render();
                 continue;
