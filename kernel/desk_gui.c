@@ -173,7 +173,7 @@ typedef struct {
 static const dg_icon_t dg_icons[DG_ICON_N] = {
     { "文件", 0u }, { "文本", 1u }, { "计算器", 2u }, { "终端", 3u },
     { "浏览器", 4u }, { "设置", 5u }, { "音乐", 6u }, { "游戏", 7u },
-    { "照片", 8u }, { "时钟", 9u }, { "监控", 10u },
+    { "照片", 8u }, { "时钟", 9u }, { "监控", 10u }, { "天气", 11u },
 };
 
 /* 图标图案：32x32 方块，用几何色块组合（像素风，全自研） */
@@ -192,6 +192,7 @@ static void dg_icon_pattern(u32 x, u32 y, u32 idx)
     case 8u: c1 = dg_rgb(0xE8,0xA0,0x40); c2 = dg_rgb(0xF8,0xE0,0xB0); c3 = dg_rgb(0xA0,0x60,0x20); break; /* 照片 */
     case 9u: c1 = dg_rgb(0x28,0x3A,0x50); c2 = dg_rgb(0xE8,0xE8,0xE8); c3 = dg_rgb(0x58,0x88,0xC0); break; /* 时钟 */
     case 10u: c1 = dg_rgb(0x1E,0x3A,0x24); c2 = dg_rgb(0x90,0xE8,0x90); c3 = dg_rgb(0x40,0x80,0x40); break; /* 监控 */
+    case 11u: c1 = dg_rgb(0x1A,0x3A,0x5E); c2 = dg_rgb(0xE0,0xF0,0xFF); c3 = dg_rgb(0x40,0xA0,0xE0); break; /* 天气 */
     default: c1 = c2 = c3 = dg_rgb(0x60,0x60,0x60); break;
     }
     dg_fill(x, y, 32u, 32u, c1);                     /* 底 */
@@ -262,6 +263,11 @@ static void dg_icon_pattern(u32 x, u32 y, u32 idx)
         dg_fill(x + 14u, y + 10u, 5u, 10u, c2);
         dg_fill(x + 20u, y + 8u, 5u, 8u, c1);
         break;
+    case 11u:   /* 天气：太阳 */
+        dg_fill(x + 13u, y + 13u, 6u, 6u, c2);
+        dg_fill(x + 9u, y + 15u, 14u, 2u, c3);
+        dg_fill(x + 15u, y + 9u, 2u, 14u, c3);
+        break;
     default:
         break;
     }
@@ -289,12 +295,13 @@ static u32  dg_move_mode = 0u; /* 移动模式 */
 #define DG_MENU_START  1u
 #define DG_MENU_RIGHT  2u
 static u32  dg_menu    = DG_MENU_NONE;
+static u32  dg_wx_idx  = 0u;              /* 天气：0晴 1多云 2雨 3雪 */
 static u32  dg_menusel = 0u;
 
 static const char *dg_apps[DG_ICON_N] = {
     "文件管理器", "文本编辑器", "计算器", "图形终端",
     "浏览器", "设置中心", "音乐播放器", "游戏中心",
-    "照片查看器", "时钟日历", "系统监控",
+    "照片查看器", "时钟日历", "系统监控", "天气",
 };
 
 /* 无符号整数转字符串 */
@@ -497,6 +504,25 @@ static void dg_win_content(const dg_win_t *w)
             dg_text(bx, by + 150u, "数字键 1/2/3 切换图片  M 移动  N 最小化  Esc 关闭", gray, body);
             break;
         }
+    case 11u: /* 天气 */
+        {
+            static const char *wxname[4] = { "晴朗", "多云", "小雨", "小雪" };
+            static const int   wxtemp[4] = { 26, 20, 15, -2 };
+            char b1[12];
+            u32 wc = dg_rgb(0x1E,0x6F,0xDC);
+            dg_text(bx, by, "XOS 天气", fg, body);
+            dg_text(bx + 4u, by + 24u, "城市: 上海  今日天气: ", gray, body);
+            dg_text(bx + 200u, by + 24u, wxname[dg_wx_idx], blue, body);
+            dg_u2s((u32)(wxtemp[dg_wx_idx] > 0 ? wxtemp[dg_wx_idx] : -wxtemp[dg_wx_idx]), b1);
+            dg_text(bx + 4u, by + 46u, "气温: ", gray, body);
+            dg_text(bx + 64u, by + 46u, b1, fg, body);
+            dg_text(bx + 92u, by + 46u, " °C", gray, body);
+            dg_text(bx + 4u, by + 68u, "体感: ", gray, body);
+            dg_text(bx + 64u, by + 68u, "适宜户外活动", wc, body);
+            dg_text(bx + 4u, by + 90u, "数字 1-4 切换天气类型  (1晴 2多云 3雨 4雪)", gray, body);
+            dg_text(bx, by + 132u, "1-4切换  Esc关闭  M移动", gray, body);
+        }
+        break;
     case 10u: /* 系统监控 */
         {
             pmm_stats_t pst;
@@ -1213,6 +1239,18 @@ void desk_gui_run(void)
                 } else if (key == KEY_R) {
                     dg_st_running = 0u;
                     dg_st_total = 0u;
+                }
+                dg_render();
+                continue;
+            }
+            /* 天气：数字键 1-4 切换 */
+            if (w->icon == 11u) {
+                if (key == KEY_ESC) {
+                    dg_win_close();
+                } else if (key == KEY_M) {
+                    dg_move_mode = 1u;
+                } else if (key >= KEY_1 && key <= KEY_4) {
+                    dg_wx_idx = key - KEY_1;
                 }
                 dg_render();
                 continue;
