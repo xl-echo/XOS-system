@@ -15,6 +15,8 @@
 
 int  desk_gui_init(void);              /* 切 VBE 640x480x32 + 映射 LFB；0=成功 */
 void desk_gui_run(void);               /* 渲染桌面 + 事件循环；Esc 退出回文本 Shell */
+/* 首次使用欢迎向导（首登创建账户后置位，Enter 关闭） */
+extern u32 dg_welcome;
 
 /* 渲染原语（供登录界面等图形模块复用） */
 u32  dg_rgb(u32 r, u32 g, u32 b);

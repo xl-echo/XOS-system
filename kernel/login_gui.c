@@ -159,6 +159,7 @@ static int lg_submit(void)
             return 1;
         }
         mu_session_open(uid, token, sizeof(token));
+        dg_welcome = 1u;                 /* 首次使用欢迎向导 */
         lg_set_status("管理员账户创建成功，正在进入系统...", dg_rgb(0x60, 0xE0, 0x80));
         return 0;
     }

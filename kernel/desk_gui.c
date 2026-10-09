@@ -36,6 +36,8 @@ static u32  dg_gm_seed = 1u;
 /* 照片查看器：当前图片索引 0-2 */
 static u32  dg_ph_idx = 0u;
 
+u32 dg_welcome = 0u;                 /* 首次使用欢迎向导 */
+
 static u32 dg_rand(void)
 {
     dg_gm_seed = dg_gm_seed * 1103515245u + 12345u;
@@ -650,6 +652,21 @@ static void dg_render(void)
                 dg_rgb(0x90,0xA0,0xB8), dg_rgb(0x22,0x2A,0x38));
     }
 
+    /* 5.5) 首次使用欢迎弹窗 */
+    if (dg_welcome) {
+        u32 wx = 60u, wy = 70u, ww = DG_W - 120u, wh = 190u;
+        dg_fill(wx, wy, ww, wh, dg_rgb(0x22,0x2A,0x38));
+        dg_rect(wx, wy, ww, wh, dg_rgb(0x58,0x88,0xC0));
+        dg_fill(wx, wy, ww, 26u, dg_rgb(0x1E,0x6F,0xD0));
+        dg_text(wx + 10u, wy + 9u, "欢迎使用 XOS", dg_rgb(0xFF,0xFF,0xFF), dg_rgb(0x1E,0x6F,0xD0));
+        dg_text(wx + 16u, wy + 44u, "· Tab 选择桌面图标，Enter 打开应用", dg_rgb(0xD0,0xD8,0xE0), dg_rgb(0x22,0x2A,0x38));
+        dg_text(wx + 16u, wy + 68u, "· S 开始菜单  R 右键菜单", dg_rgb(0xD0,0xD8,0xE0), dg_rgb(0x22,0x2A,0x38));
+        dg_text(wx + 16u, wy + 92u, "· M 移动窗口  N 最小化  Esc 关闭", dg_rgb(0xD0,0xD8,0xE0), dg_rgb(0x22,0x2A,0x38));
+        dg_text(wx + 16u, wy + 116u, "· 开始菜单含全部 10 个应用", dg_rgb(0xD0,0xD8,0xE0), dg_rgb(0x22,0x2A,0x38));
+        dg_text(wx + 16u, wy + 140u, "· 文本编辑器内容保存到真实文件系统 /note.txt", dg_rgb(0xD0,0xD8,0xE0), dg_rgb(0x22,0x2A,0x38));
+        dg_text(wx + ww / 2u - 88u, wy + wh - 24u, "按 Enter 开始使用", dg_rgb(0x30,0xC0,0x50), dg_rgb(0x22,0x2A,0x38));
+    }
+
     /* 6) 右键菜单浮层 */
     if (dg_menu == DG_MENU_RIGHT) {
         static const char *ritems[3] = { "打开", "属性", "关闭窗口" };
@@ -1003,6 +1020,15 @@ void desk_gui_run(void)
         }
         if (ev.type != EV_KEY_DOWN) continue;
         key = ev.key;
+
+        /* --- 首次使用欢迎向导：Enter 关闭 --- */
+        if (dg_welcome) {
+            if (key == KEY_ENTER || key == KEY_ESC) {
+                dg_welcome = 0u;
+                dg_render();
+            }
+            continue;
+        }
 
         /* --- 开始菜单 --- */
         if (dg_menu == DG_MENU_START) {
