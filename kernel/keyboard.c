@@ -214,6 +214,29 @@ static void key_handle(u32 slot, u32 key, int down)
 }
 
 /* ---------------- PS/2 轮询（真实端口） ---------------- */
+
+/* 扩展键映射（Set1 E0 前缀）：方向键/编辑键 */
+static u32 sc_ext_key(u8 sc)
+{
+    switch (sc) {
+    case 0x48u: return KEY_UP;
+    case 0x50u: return KEY_DOWN;
+    case 0x4Bu: return KEY_LEFT;
+    case 0x4Du: return KEY_RIGHT;
+    case 0x53u: return KEY_DEL;
+    case 0x47u: return KEY_HOME;
+    case 0x4Fu: return KEY_END;
+    case 0x49u: return KEY_PGUP;
+    case 0x51u: return KEY_PGDN;
+    case 0x1Cu: return KEY_ENTER;   /* 小键盘 Enter */
+    case 0x35u: return KEY_KP0;
+    case 0x5Cu: return KEY_5;       /* 小键盘 5 */
+    case 0x52u: return KEY_INSERT;
+    default:    return KEY_NONE;
+    }
+}
+
+static int g_ext_pending = 0;        /* 0xE0 扩展前缀待定 */
 int kbd_poll(void)
 {
     u8 data;
@@ -221,17 +244,18 @@ int kbd_poll(void)
     int down;
     if ((inb(KBD_CMD_PORT) & KBD_STAT_OBF) == 0u) return 0;   /* 无数据 */
     data = inb(KBD_DATA_PORT);
-    if (data == 0xE0u) return 0;   /* 扩展前缀：简化处理 */
+    if (data == 0xE0u) { g_ext_pending = 1; return 1; }   /* 扩展前缀，等下一字节 */
     down = (data & 0x80u) ? 0 : 1;
     data &= 0x7Fu;
     if (g_scan_set == SCAN_SET1) {
-        if (data >= 128u) return 0;
-        key = sc_set1[data];
+        if (data >= 128u) { g_ext_pending = 0; return 1; }
+        key = g_ext_pending ? sc_ext_key(data) : sc_set1[data];
     } else if (g_scan_set == SCAN_SET2) {
         key = sc2_lookup(data);
     } else {
         key = KEY_NONE;
     }
+    g_ext_pending = 0;
     if (key != KEY_NONE && key != KEY_KP0 && key != KEY_5) {
         key_handle(0u, key, down);
     }

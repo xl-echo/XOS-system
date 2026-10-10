@@ -1388,6 +1388,9 @@ static void dg_window_draw(const dg_win_t *w)
     u32 body  = dg_theme_c(3u);
     u32 frm   = dg_theme_c(4u);
     const char *name = dg_icons[w->icon].name;
+    /* 焦点区分：焦点窗口标题栏高亮，非焦点暗化（交互一致性，用户可一眼分辨活动窗口） */
+    if (w != &dg_wins[dg_focus])
+        title = (g_theme == 0u) ? dg_rgb(0x22,0x32,0x4A) : dg_rgb(0xB8,0xC0,0xC8);
     /* 投影阴影（右/下 4px，制造层次感；先画阴影再画窗体） */
     if (g_theme == 1u) {
         dg_fill(w->x + 4u, w->y + 4u, w->w, w->h, dg_rgb(0x50,0x58,0x60));
