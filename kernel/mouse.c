@@ -434,6 +434,15 @@ int mse_set_dbl(u32 on, u32 window)
     return 0;
 }
 
+/* 绝对定位光标（软件注入/驱动调试用）：直接设定绝对坐标并钳制到屏幕 */
+void mse_set_pos(u32 x, u32 y)
+{
+    if (g_screen_w && x >= g_screen_w) x = g_screen_w - 1u;
+    if (g_screen_h && y >= g_screen_h) y = g_screen_h - 1u;
+    g_pos_x = (i32)x;
+    g_pos_y = (i32)y;
+}
+
 int mse_set_pkt_mode(u32 slot, u32 mode)
 {
     mouse_slot_t *st = slot_get(slot);

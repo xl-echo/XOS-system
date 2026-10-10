@@ -85,6 +85,7 @@ u32    mse_ev_count(void);
 void   mse_set_screen(u32 w, u32 h);         /* 设置逻辑屏幕边界 */
 u32    mse_get_screen(u32 *w, u32 *h);
 void   mse_get_pos(u32 *x, u32 *y);          /* 当前光标位置 */
+void   mse_set_pos(u32 x, u32 y);            /* 绝对定位光标（钳制屏幕内） */
 u32    mse_get_buttons(void);                /* 当前按键位掩码 */
 int    mse_set_sens(u32 s);                  /* 灵敏度 1..16 */
 u32    mse_get_sens(void);

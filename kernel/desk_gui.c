@@ -41,6 +41,8 @@ u32 g_hc = 0u;              /* 高对比度模式（无障碍，F7 切换）：�
 static u32 g_mx = 320u, g_my = 240u;   /* 光标位置（随屏幕裁剪） */
 static u32 g_mbtn = 0u;                /* 当前按键掩码 */
 static u32 g_mdown_x = 0u, g_mdown_y = 0u;   /* 按下位置（防误触） */
+static int  g_drag_win = -1;           /* 正在拖动的窗口索引（标题栏拖动移动） */
+static i32  g_drag_ox = 0, g_drag_oy = 0;    /* 拖动偏移（光标-窗口原点） */
 
 /* 主题取色：按主题返回界面关键色（普通用户可直接识别两套风格） */
 static u32 dg_theme_c(u32 idx)
@@ -2206,15 +2208,50 @@ void desk_gui_run(void)
         mse_poll();
         if (mse_read_event(&mev) == 0) {
             g_mx = mev.x; g_my = mev.y;
-            if (mev.type == MOUSE_EV_BTN_DOWN) {
+            if (mev.type == MOUSE_EV_MOVE) {
+                /* 拖动中：窗口跟随光标移动（市面习惯，越界裁剪） */
+                if (g_drag_win >= 0) {
+                    dg_win_t *w = &dg_wins[g_drag_win];
+                    i32 nx = (i32)mev.x - g_drag_ox;
+                    i32 ny = (i32)mev.y - g_drag_oy;
+                    if (nx < 0) nx = 0;
+                    if (ny < 0) ny = 0;
+                    if (nx + (i32)w->w > (i32)DG_W) nx = (i32)DG_W - (i32)w->w;
+                    if (ny + (i32)w->h > (i32)(DG_H - DG_TASKBAR)) ny = (i32)(DG_H - DG_TASKBAR) - (i32)w->h;
+                    w->x = nx; w->y = ny;
+                    dg_render();
+                } else if (g_mbtn != 0u) {
+                    dg_render();   /* 按住移动：更新光标（拖动预览） */
+                }
+            } else if (mev.type == MOUSE_EV_BTN_DOWN) {
                 g_mbtn |= mev.button;
-                if (mev.button == MOUSE_BTN_LEFT) { g_mdown_x = mev.x; g_mdown_y = mev.y; }
+                if (mev.button == MOUSE_BTN_LEFT) {
+                    g_mdown_x = mev.x; g_mdown_y = mev.y;
+                    /* 命中窗口标题栏 → 进入拖动（市面习惯：按住标题栏移动窗口） */
+                    if (g_drag_win < 0) {
+                        u32 ki;
+                        for (ki = 0u; ki < DG_WIN_MAX; ki++) {
+                            dg_win_t *w = &dg_wins[ki];
+                            if (w->open && !w->min &&
+                                mev.x >= (u32)w->x && mev.x <= (u32)(w->x + (i32)w->w) &&
+                                mev.y >= (u32)w->y && mev.y <= (u32)(w->y + 22)) {
+                                g_drag_win = (int)ki;
+                                g_drag_ox = (i32)mev.x - w->x;
+                                g_drag_oy = (i32)mev.y - w->y;
+                                dg_focus = ki;
+                                break;
+                            }
+                        }
+                    }
+                }
             } else if (mev.type == MOUSE_EV_BTN_UP) {
                 g_mbtn &= ~mev.button;
                 /* 左键释放：若位移小视为点击，做命中交互 */
-                if (mev.button == MOUSE_BTN_LEFT &&
-                    (mev.x - g_mdown_x) * (mev.x - g_mdown_x) +
-                    (mev.y - g_mdown_y) * (mev.y - g_mdown_y) < 36u) {
+                if (mev.button == MOUSE_BTN_LEFT) {
+                    /* 拖动结束：窗口已随移动更新位置，仅复位拖动态 */
+                    g_drag_win = -1;
+                    if ((mev.x - g_mdown_x) * (mev.x - g_mdown_x) +
+                        (mev.y - g_mdown_y) * (mev.y - g_mdown_y) < 36u) {
                     u32 hx = mev.x, hy = mev.y;
                     /* 任务栏开始按钮（左下角 56x28） */
                     if (hy >= DG_H - g_tb_h && hx < 56u) {
@@ -2278,6 +2315,7 @@ void desk_gui_run(void)
                 }
                 dg_render();
             }
+        }
         }
         /* 窗口打开动画：滑入期间每 5 tick 重绘（动效与过渡） */
         if (dg_anim_active && pit_tick_count() - dg_last_repaint >= 5u) {
