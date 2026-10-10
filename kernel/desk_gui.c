@@ -14,6 +14,7 @@
 #include "display.h"
 #include "vmm.h"
 #include "keyboard.h"
+#include "mouse.h"
 #include "console.h"
 #include "irq.h"
 #include "string.h"
@@ -35,6 +36,11 @@ u32 g_tb_h = 30u;           /* 任务栏高度：随字体缩放自适应（1x=3
 /* ---------------- 主题系统（深色 0 / 浅色 1，F6 切换） ---------------- */
 u32 g_theme = 0u;           /* 0=深色（默认） 1=浅色 */
 u32 g_hc = 0u;              /* 高对比度模式（无障碍，F7 切换）：黑白黄硬对比 */
+
+/* ---------------- 鼠标支持（普通用户操作习惯：光标+点击交互） ---------------- */
+static u32 g_mx = 320u, g_my = 240u;   /* 光标位置（随屏幕裁剪） */
+static u32 g_mbtn = 0u;                /* 当前按键掩码 */
+static u32 g_mdown_x = 0u, g_mdown_y = 0u;   /* 按下位置（防误触） */
 
 /* 主题取色：按主题返回界面关键色（普通用户可直接识别两套风格） */
 static u32 dg_theme_c(u32 idx)
@@ -1704,6 +1710,20 @@ static void dg_render(void)
         }
     }
 
+    /* 7) 鼠标光标（普通用户操作习惯：箭头指针，白底黑边） */
+    if (g_mx + 9u < DG_W && g_my + 9u < DG_H) {
+        u32 cx = g_mx, cy = g_my;
+        dg_fill(cx, cy, 3u, 1u, dg_rgb(0xFF,0xFF,0xFF));
+        dg_fill(cx, cy, 1u, 4u, dg_rgb(0xFF,0xFF,0xFF));
+        dg_fill(cx + 2u, cy + 2u, 3u, 1u, dg_rgb(0xFF,0xFF,0xFF));
+        dg_fill(cx, cy + 4u, 2u, 3u, dg_rgb(0xFF,0xFF,0xFF));
+        dg_fill(cx, cy, 2u, 1u, dg_rgb(0x00,0x00,0x00));
+        dg_fill(cx, cy + 1u, 1u, 2u, dg_rgb(0x00,0x00,0x00));
+        dg_fill(cx + 3u, cy, 1u, 2u, dg_rgb(0x00,0x00,0x00));
+        dg_fill(cx + 2u, cy + 2u, 1u, 1u, dg_rgb(0x00,0x00,0x00));
+        dg_fill(cx + 1u, cy + 4u, 1u, 1u, dg_rgb(0x00,0x00,0x00));
+    }
+
     con_flush();
 }
 
@@ -2166,6 +2186,9 @@ void desk_gui_run(void)
     kbd_event_t ev, tmp;
     if (desk_gui_init() != 0) return;              /* 图形不可用：安全回退文本 Shell */
     while (kbd_read_event(&tmp) == 0) { }           /* 清空残留键盘事件 */
+    mse_init();
+    mse_set_screen(DG_W, DG_H);
+    mse_get_pos(&g_mx, &g_my);
 
     dg_nwin = 0u;
     dg_focus = 0u;
@@ -2177,7 +2200,85 @@ void desk_gui_run(void)
 
     for (;;) {
         u32 key;
+        mouse_event_t mev;
         kbd_poll();
+        /* --- 鼠标：轮询 + 事件处理（光标移动/点击交互，普通用户操作习惯） --- */
+        mse_poll();
+        if (mse_read_event(&mev) == 0) {
+            g_mx = mev.x; g_my = mev.y;
+            if (mev.type == MOUSE_EV_BTN_DOWN) {
+                g_mbtn |= mev.button;
+                if (mev.button == MOUSE_BTN_LEFT) { g_mdown_x = mev.x; g_mdown_y = mev.y; }
+            } else if (mev.type == MOUSE_EV_BTN_UP) {
+                g_mbtn &= ~mev.button;
+                /* 左键释放：若位移小视为点击，做命中交互 */
+                if (mev.button == MOUSE_BTN_LEFT &&
+                    (mev.x - g_mdown_x) * (mev.x - g_mdown_x) +
+                    (mev.y - g_mdown_y) * (mev.y - g_mdown_y) < 36u) {
+                    u32 hx = mev.x, hy = mev.y;
+                    /* 任务栏开始按钮（左下角 56x28） */
+                    if (hy >= DG_H - g_tb_h && hx < 56u) {
+                        dg_menu = (dg_menu == DG_MENU_START) ? DG_MENU_NONE : DG_MENU_START;
+                        dg_menusel = 0u;
+                        dg_render();
+                    }
+                    /* 开始菜单项点击（与绘制布局一致：mx=6, 项 y=my+18+i*14） */
+                    else if (dg_menu == DG_MENU_START && hx >= 10u && hx <= 216u) {
+                        u32 my0 = (DG_H > DG_TASKBAR + 336u + 18u)
+                                      ? DG_H - DG_TASKBAR - 24u * 14u - 18u : 8u;
+                        if (hy >= my0 + 18u) {
+                            u32 it = (hy - (my0 + 18u)) / 14u;
+                            if (it < DG_ICON_N) {
+                                dg_win_open(it);
+                                dg_menu = DG_MENU_NONE;
+                                dg_render();
+                            }
+                        }
+                    }
+                    /* 桌面图标网格命中（与键盘导航共用布局） */
+                    else if (dg_menu == DG_MENU_NONE && dg_nwin == 0u) {
+                        u32 cw = 96u, rh = 94u, maxw = 0u, cols, i, j;
+                        for (j = 0u; j < DG_ICON_N; j++) {
+                            u32 tw = dg_text_w(dg_icons[j].name);
+                            if (tw > maxw) maxw = tw;
+                        }
+                        if (maxw + 28u > cw) cw = maxw + 28u;
+                        rh = 36u + 16u + 8u * g_font_scale + 34u;
+                        cols = DG_W / cw; if (cols < 1u) cols = 1u;
+                        for (i = 0u; i < DG_ICON_N; i++) {
+                            u32 ix = 24u + (i % cols) * cw;
+                            u32 iy = 40u + (i / cols) * rh;
+                            if (hx >= ix - 4u && hx <= ix + 44u && hy >= iy - 4u && hy <= iy + 34u + 16u) {
+                                dg_sel = i;
+                                dg_win_open(i);
+                                break;
+                            }
+                        }
+                        dg_render();
+                    }
+                }
+            } else if (mev.type == MOUSE_EV_DOUBLE && mev.button == MOUSE_BTN_LEFT && dg_menu == DG_MENU_NONE && dg_nwin == 0u) {
+                /* 双击：命中图标打开 */
+                u32 cw = 96u, rh = 94u, maxw = 0u, cols, i, j;
+                for (j = 0u; j < DG_ICON_N; j++) {
+                    u32 tw = dg_text_w(dg_icons[j].name);
+                    if (tw > maxw) maxw = tw;
+                }
+                if (maxw + 28u > cw) cw = maxw + 28u;
+                rh = 36u + 16u + 8u * g_font_scale + 34u;
+                cols = DG_W / cw; if (cols < 1u) cols = 1u;
+                for (i = 0u; i < DG_ICON_N; i++) {
+                    u32 ix = 24u + (i % cols) * cw;
+                    u32 iy = 40u + (i / cols) * rh;
+                    if (mev.x >= ix - 4u && mev.x <= ix + 44u && mev.y >= iy - 4u && mev.y <= iy + 34u + 16u) {
+                        dg_sel = i;
+                        dg_win_open(i);
+                        break;
+                    }
+                }
+                dg_render();
+            }
+        }
         /* 窗口打开动画：滑入期间每 5 tick 重绘（动效与过渡） */
         if (dg_anim_active && pit_tick_count() - dg_last_repaint >= 5u) {
             dg_last_repaint = pit_tick_count();
@@ -2222,6 +2323,7 @@ void desk_gui_run(void)
                 if (display_get_mode(mi, &dm) == 0) { g_dgw = dm.width; g_dgh = dm.height; }
                 sysconf_set_u32("screen.mode", mi);   /* 分辨率记忆恢复 */
                 dg_font_scale_auto();                 /* 字体随分辨率重算档位 */
+                mse_set_screen(DG_W, DG_H);           /* 鼠标边界随分辨率自适应 */
                 dg_render();
             }
             continue;
