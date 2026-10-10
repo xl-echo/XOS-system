@@ -107,6 +107,7 @@ KERNEL_SOURCES = [
     'crash.c',        # 崩溃转储（自研）：panic 现场写入固定内存区（寄存器/CR/栈快照/回溯链），重启可诊断
     'rtc.c',          # 实时时钟（自研）：CMOS RTC 真实读取/写入、BCD、闰年、时间戳、date 命令
     'xffs.c',         # 磁盘文件系统（自研）：XFFS v1 /disk 挂载，LBA 7400 起，重启保留用户数据
+    'sysconf.c',      # 系统配置持久化（自研）：/disk/xos.conf 键值对，分辨率记忆/偏好跨重启保存
     'inst.c',         # 安装程序-包管理（第32册）：介质引导/分区格式化/文件复制/引导装载/驱动选择
     'virt.c',         # 虚拟化支持（第33册）：hypervisor 探测/CPUID 特性/品牌识别/VirtIO 扫描/ACPI/TSC
     'shell_interactive.c',  # 交互式终端 Shell：自检通过后接管控制台，提供可用命令终端

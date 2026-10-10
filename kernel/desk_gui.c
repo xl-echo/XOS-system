@@ -22,6 +22,7 @@
 #include "task.h"
 #include "sound.h"
 #include "rtc.h"
+#include "sysconf.h"
 #include "xos_wallpaper.h"
 
 extern void *memset(void *dst, int c, unsigned int n);
@@ -1514,10 +1515,13 @@ static void dg_render(void)
 int desk_gui_init(void)
 {
     static u32 dg_inited = 0u;
-    u32 a, rc, m_idx = 7u;
+    u32 a, rc, m_idx = 7u, saved;
     disp_mode_t dm;
     if (dg_inited) return 0;                  /* 已初始化（图形登录已映射 LFB） */
-    rc = display_set_mode(m_idx);             /* 1024x768x32 VBE（自适应高分辨率） */
+    /* 分辨率记忆恢复：上次成功使用的显示模式优先（5/6/7 合法，其余钳制） */
+    saved = sysconf_get_u32("screen.mode", 7u);
+    if (saved >= 5u && saved <= 7u) m_idx = saved;
+    rc = display_set_mode(m_idx);             /* VBE 图形模式（5=640x480 6=800x600 7=1024x768） */
     if (rc != 0) {
         con_puts("  [desk_gui] display_set_mode(7) failed, try 640x480\n");
         con_flush();
@@ -1530,7 +1534,7 @@ int desk_gui_init(void)
     } else {
         g_dgw = dm.width; g_dgh = dm.height;
     }
-    con_printf("  [desk_gui] desktop %ux%ux32\n", g_dgw, g_dgh);
+    con_printf("  [desk_gui] desktop %ux%ux32 (mode %u)\n", g_dgw, g_dgh, m_idx);
     con_flush();
     if (vmm_map_device_huge(vmm_kernel_mm(), DG_LFB, DG_LFB, PTE_P | PTE_RW) != VMM_OK) {
         con_puts("  [desk_gui] huge device map failed, fallback 4KB pages\n");
@@ -1886,6 +1890,12 @@ static void dg_win_open(u32 icon)
     dg_wins[slot].y = 60u + (slot % 3u) * 30u;
     dg_wins[slot].w = dg_win_sz[dg_wsz][0];
     dg_wins[slot].h = dg_win_sz[dg_wsz][1];
+    /* 窗口边界约束：打开位置钳制在屏幕内（含任务栏留白），防越界不可达 */
+    if (dg_wins[slot].x + dg_wins[slot].w + 8u > DG_W)
+        dg_wins[slot].x = (DG_W > dg_wins[slot].w + 8u) ? DG_W - dg_wins[slot].w - 8u : 8u;
+    if (dg_wins[slot].y + dg_wins[slot].h + 8u > DG_H - DG_TASKBAR)
+        dg_wins[slot].y = (DG_H - DG_TASKBAR > dg_wins[slot].h + 8u)
+                              ? DG_H - DG_TASKBAR - dg_wins[slot].h - 8u : 8u;
     dg_wins[slot].min = 0u;
     dg_wins[slot].inlen = 0u;
     dg_wins[slot].inbuf[0] = 0;
@@ -1980,6 +1990,7 @@ void desk_gui_run(void)
             if (display_set_mode(mi) == 0) {
                 disp_mode_t dm;
                 if (display_get_mode(mi, &dm) == 0) { g_dgw = dm.width; g_dgh = dm.height; }
+                sysconf_set_u32("screen.mode", mi);   /* 分辨率记忆恢复 */
                 dg_render();
             }
             continue;
