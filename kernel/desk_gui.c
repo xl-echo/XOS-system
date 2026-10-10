@@ -449,6 +449,8 @@ typedef struct {
     u32  icon;                 /* 关联图标 */
     u32  x, y, w, h;           /* 窗口位置与尺寸 */
     u32  min;                  /* 最小化（缩到任务栏） */
+    u32  anim;                 /* 打开动画中（滑入） */
+    u32  anim_from;            /* 滑入目标 y */
     char inbuf[24];            /* 输入缓冲（计算器/终端） */
     u32  inlen;
     char out[4][40];           /* 输出缓冲（终端/计算器结果） */
@@ -456,6 +458,7 @@ typedef struct {
 
 static dg_win_t dg_wins[DG_WIN_MAX];
 static u32  dg_nwin  = 0u;     /* 打开窗口数 */
+static u32  dg_anim_active = 0u; /* 有窗口滑入动画在播 */
 static u32  dg_focus = 0u;     /* 焦点窗口索引 */
 static u32  dg_move_mode = 0u; /* 移动模式 */
 
@@ -2058,6 +2061,31 @@ static void dg_win_open(u32 icon)
     dg_focus = slot;
     dg_nwin++;
     dg_move_mode = 0u;
+    /* 打开滑入动画：从屏幕底部滑到目标位（动效与过渡） */
+    dg_wins[slot].anim_from = dg_wins[slot].y;
+    dg_wins[slot].y = (DG_H > 40u) ? DG_H - 40u : 8u;
+    dg_wins[slot].anim = 1u;
+    dg_anim_active = 1u;
+}
+
+/* 窗口动画推进：滑入（每帧上移至目标位后停） */
+static void dg_anim_step(void)
+{
+    u32 i, left = 0u;
+    for (i = 0u; i < DG_WIN_MAX; i++) {
+        dg_win_t *w = &dg_wins[i];
+        if (!w->open || w->min || !w->anim) continue;
+        if (w->y > w->anim_from) {
+            u32 d = w->y - w->anim_from;
+            u32 step = (d > 26u) ? 26u : d;
+            w->y -= step;
+            if (w->y <= w->anim_from) { w->y = w->anim_from; w->anim = 0; }
+            else left = 1u;
+        } else {
+            w->anim = 0;
+        }
+    }
+    dg_anim_active = left;
 }
 
 /* 关闭焦点窗口，焦点跳到最近打开的窗口 */
@@ -2091,6 +2119,12 @@ void desk_gui_run(void)
     for (;;) {
         u32 key;
         kbd_poll();
+        /* 窗口打开动画：滑入期间每 5 tick 重绘（动效与过渡） */
+        if (dg_anim_active && pit_tick_count() - dg_last_repaint >= 5u) {
+            dg_last_repaint = pit_tick_count();
+            dg_anim_step();
+            dg_render();
+        }
         if (kbd_read_event(&ev) != 0) {
             /* 闹钟心跳：无键时由 PIT 定时中断唤醒检查到点 */
             if (dg_alm_set == 2u && !dg_alm_ring &&
