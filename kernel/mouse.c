@@ -334,6 +334,11 @@ void mse_init(void)
     u8 v;
     u32 i;
 
+    /* 无条件重置按键/双击状态：防止早期自检注入残留影响真实交互 */
+    g_buttons = 0u;
+    g_dbl_key = 0u;
+    g_dbl_tick = 0u;
+
     if (g_init_done) return;
     g_init_done = 1u;
 

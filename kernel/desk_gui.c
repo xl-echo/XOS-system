@@ -2259,6 +2259,53 @@ void desk_gui_run(void)
                         dg_menusel = 0u;
                         dg_render();
                     }
+                    /* 任务栏窗口按钮（市面习惯：点击任务栏应用图标切换/最小化恢复） */
+                    else if (hy >= DG_H - g_tb_h && hx >= 300u) {
+                        u32 rbx = 300u, bi;
+                        for (bi = 0u; bi < DG_WIN_MAX; bi++) {
+                            if (dg_wins[bi].open) {
+                                if (hx >= rbx && hx <= rbx + 40u) {
+                                    if (dg_wins[bi].min) {
+                                        dg_wins[bi].min = 0u;
+                                        dg_anim_active = 0u;
+                                    } else if (dg_focus != bi) {
+                                        dg_focus = bi;      /* 切到该窗口 */
+                                        dg_anim_active = 0u;
+                                    } else {
+                                        dg_wins[bi].min = 1u; /* 点击当前窗口→最小化 */
+                                    }
+                                    dg_render();
+                                    break;
+                                }
+                                rbx += 46u;
+                            }
+                        }
+                    }
+                    /* 窗口标题栏按钮：最小化(_) / 关闭(X)（普通用户直接识别） */
+                    else if (dg_nwin > 0u) {
+                        u32 bi;
+                        for (bi = 0u; bi < DG_WIN_MAX; bi++) {
+                            dg_win_t *w = &dg_wins[bi];
+                            if (w->open && !w->min &&
+                                hy >= (u32)w->y && hy <= (u32)(w->y + 21)) {
+                                if (hx >= (u32)(w->x + (i32)w->w - 24) &&
+                                    hx <= (u32)(w->x + (i32)w->w - 6)) {
+                                    w->open = 0u;
+                                    if (dg_nwin > 0u) dg_nwin--;
+                                    dg_focus = 0u; dg_sel = bi;
+                                    dg_anim_active = 0u;
+                                    dg_render();
+                                    break;
+                                }
+                                if (hx >= (u32)(w->x + (i32)w->w - 48) &&
+                                    hx <= (u32)(w->x + (i32)w->w - 30)) {
+                                    w->min = 1u;
+                                    dg_render();
+                                    break;
+                                }
+                            }
+                        }
+                    }
                     /* 开始菜单项点击（与绘制布局一致：mx=6, 项 y=my+18+i*14） */
                     else if (dg_menu == DG_MENU_START && hx >= 10u && hx <= 216u) {
                         u32 my0 = (DG_H > DG_TASKBAR + 336u + 18u)
