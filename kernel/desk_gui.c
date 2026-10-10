@@ -32,6 +32,40 @@ u32 g_dgw = 640u, g_dgh = 480u;
 u32 g_font_scale = 1u;      /* 全局字体缩放：1=8px 2=16px 3=24px */
 u32 g_tb_h = 30u;           /* 任务栏高度：随字体缩放自适应（1x=30 2x=38 3x=46） */
 
+/* ---------------- 主题系统（深色 0 / 浅色 1，F6 切换） ---------------- */
+u32 g_theme = 0u;           /* 0=深色（默认） 1=浅色 */
+
+/* 主题取色：按主题返回界面关键色（普通用户可直接识别两套风格） */
+static u32 dg_theme_c(u32 idx)
+{
+    if (g_theme == 1u) {
+        switch (idx) {
+        case 0u: return dg_rgb(0xD8,0xDC,0xE2);   /* 任务栏 */
+        case 1u: return dg_rgb(0x18,0x18,0x18);   /* 主文本 */
+        case 2u: return dg_rgb(0x2F,0x6F,0xB0);   /* 窗口标题栏 */
+        case 3u: return dg_rgb(0xF8,0xF8,0xF8);   /* 窗口体 */
+        case 4u: return dg_rgb(0x40,0x50,0x60);   /* 窗口边框 */
+        case 5u: return dg_rgb(0x1E,0x66,0xD0);   /* 开始按钮 */
+        case 6u: return dg_rgb(0x5A,0x7A,0x9A);   /* 时钟小组件底 */
+        case 7u: return dg_rgb(0x90,0xA0,0xB0);   /* 次级文本 */
+        case 8u: return dg_rgb(0xE8,0xEC,0xF0);   /* 菜单/列表底色 */
+        }
+        return dg_rgb(0x18,0x18,0x18);
+    }
+    switch (idx) {
+    case 0u: return dg_rgb(0x18,0x1C,0x28);   /* 任务栏 */
+    case 1u: return dg_rgb(0xE8,0xE8,0xE8);   /* 主文本 */
+    case 2u: return dg_rgb(0x1E,0x3A,0x5F);   /* 窗口标题栏 */
+    case 3u: return dg_rgb(0xEE,0xEE,0xEE);   /* 窗口体 */
+    case 4u: return dg_rgb(0x0A,0x14,0x22);   /* 窗口边框 */
+    case 5u: return dg_rgb(0x2F,0x7D,0xE1);   /* 开始按钮 */
+    case 6u: return dg_rgb(0x1E,0x3A,0x5F);   /* 时钟小组件底 */
+    case 7u: return dg_rgb(0x60,0x70,0x88);   /* 次级文本 */
+    case 8u: return dg_rgb(0x18,0x20,0x2E);   /* 菜单/列表底色 */
+    }
+    return dg_rgb(0xE8,0xE8,0xE8);
+}
+
 static u32 dg_tb_txt_y(void)  /* 任务栏文字垂直居中偏移 */
 {
     return (g_tb_h - 8u * g_font_scale) / 2u;
@@ -1341,19 +1375,25 @@ static u32 dg_win_accent(u32 icon)
 
 static void dg_window_draw(const dg_win_t *w)
 {
-    u32 title = dg_rgb(0x1E,0x3A,0x5F);
-    u32 body  = dg_rgb(0xEE,0xEE,0xEE);
+    u32 title = dg_theme_c(2u);
+    u32 body  = dg_theme_c(3u);
+    u32 frm   = dg_theme_c(4u);
     const char *name = dg_icons[w->icon].name;
     dg_fill(w->x, w->y, w->w, w->h, body);
     dg_fill(w->x, w->y, w->w, 26u, title);
     /* 左侧应用色条（直观识别应用类别） */
     dg_fill(w->x + 5u, w->y + 6u, 5u, 14u, dg_win_accent(w->icon));
-    dg_text(w->x + 16u, w->y + 9u, name, dg_rgb(0xF0,0xF0,0xF0), title);
+    dg_text(w->x + 16u, w->y + 9u, name, dg_theme_c(1u), title);
     /* 右侧尺寸档位 */
     dg_text(w->x + w->w - 40u, w->y + 9u,
             dg_wsz == 0u ? "1x" : (dg_wsz == 1u ? "2x" : "3x"),
             dg_rgb(0xE8,0xC8,0x4A), title);
-    dg_rect(w->x, w->y, w->w, w->h, dg_rgb(0x0A,0x14,0x22));
+    /* 3D 边框：上/左亮线 + 右/下暗线 + 外描边（立体可识别） */
+    dg_fill(w->x, w->y, w->w, 1u, g_theme == 1u ? dg_rgb(0xFF,0xFF,0xFF) : dg_rgb(0x38,0x4C,0x68));
+    dg_fill(w->x, w->y, 1u, w->h, g_theme == 1u ? dg_rgb(0xFF,0xFF,0xFF) : dg_rgb(0x2A,0x3C,0x54));
+    dg_fill(w->x + w->w - 1u, w->y, 1u, w->h, dg_rgb(0x30,0x40,0x50));
+    dg_fill(w->x, w->y + w->h - 1u, w->w, 1u, dg_rgb(0x30,0x40,0x50));
+    dg_rect(w->x, w->y, w->w, w->h, frm);
     /* 关闭按钮 X */
     dg_fill(w->x + w->w - 24u, w->y + 5u, 18u, 16u, dg_rgb(0xC0,0x30,0x30));
     dg_char(w->x + w->w - 20u, w->y + 9u, 'X', dg_rgb(0xFF,0xFF,0xFF), dg_rgb(0xC0,0x30,0x30), g_font_scale);
@@ -1370,8 +1410,8 @@ static void dg_window_draw(const dg_win_t *w)
 static void dg_render(void)
 {
     u32 i, x, y, k;
-    u32 bar = dg_rgb(0x18,0x1C,0x28);
-    u32 txt = dg_rgb(0xE8,0xE8,0xE8);
+    u32 bar = dg_theme_c(0u);
+    u32 txt = dg_theme_c(1u);
     u32 sel_c = dg_rgb(0xFF,0xFF,0xFF);
     u32 sec, hh, mm;
     char tbuf[16];
@@ -1427,23 +1467,23 @@ static void dg_render(void)
         wb[0] = (char)('0' + th / 10u); wb[1] = (char)('0' + th % 10u);
         wb[2] = ':'; wb[3] = (char)('0' + tm / 10u); wb[4] = (char)('0' + tm % 10u);
         wb[5] = ':'; wb[6] = (char)('0' + ts / 10u); wb[7] = (char)('0' + ts % 10u); wb[8] = 0;
-        dg_fill(DG_W - 144u, 4u, dg_text_w(wb) * 2u, 14u, dg_rgb(0x1E,0x3A,0x5F));
-        dg_text(DG_W - 142u, 6u, wb, dg_rgb(0xF0,0xF0,0xF0), dg_rgb(0x1E,0x3A,0x5F));
+        dg_fill(DG_W - 144u, 4u, dg_text_w(wb) * 2u, 14u, dg_theme_c(6u));
+        dg_text(DG_W - 142u, 6u, wb, dg_theme_c(1u), dg_theme_c(6u));
     }
     /* 4) 任务栏 */
     dg_fill(0u, DG_H - DG_TASKBAR, DG_W, DG_TASKBAR, bar);
-    dg_fill(0u, DG_H - DG_TASKBAR, DG_W, 2u, dg_rgb(0x2E,0x3A,0x4E));
+    dg_fill(0u, DG_H - DG_TASKBAR, DG_W, 2u, g_theme == 1u ? dg_rgb(0xA8,0xB0,0xBC) : dg_rgb(0x2E,0x3A,0x4E));
     /* 开始按钮 */
-    dg_fill(6u, DG_H - DG_TASKBAR + (g_tb_h - 20u) / 2u, 56u, 20u, dg_rgb(0x2F,0x7D,0xE1));
-    dg_text(14u, DG_H - DG_TASKBAR + dg_tb_txt_y(), "XOS", dg_rgb(0xFF,0xFF,0xFF), dg_rgb(0x2F,0x7D,0xE1));
+    dg_fill(6u, DG_H - DG_TASKBAR + (g_tb_h - 20u) / 2u, 56u, 20u, dg_theme_c(5u));
+    dg_text(14u, DG_H - DG_TASKBAR + dg_tb_txt_y(), "XOS", dg_rgb(0xFF,0xFF,0xFF), dg_theme_c(5u));
     /* 桌面版本标识 */
-    dg_text(78u, DG_H - DG_TASKBAR + dg_tb_txt_y(), "v1.0", dg_rgb(0x60,0x70,0x88), bar);
+    dg_text(78u, DG_H - DG_TASKBAR + dg_tb_txt_y(), "v1.0", dg_theme_c(7u), bar);
     /* 最小化窗口的恢复按钮（点击概念：按对应数字键恢复） */
     if (dg_nwin > 0u) {
         u32 rbx = 300u;
         for (i = 0u; i < DG_WIN_MAX; i++) {
             if (dg_wins[i].open) {
-                u32 col = dg_wins[i].min ? dg_rgb(0x2A,0x4A,0x6A)
+                u32 col = dg_wins[i].min ? dg_theme_c(7u)
                         : (i == dg_focus) ? dg_rgb(0x2F,0x7D,0xE1) : dg_rgb(0x2E,0x3E,0x52);
                 dg_fill(rbx, DG_H - DG_TASKBAR + (g_tb_h - 18u) / 2u, 40u, 18u, col);
                 dg_name2(tbuf, dg_icons[dg_wins[i].icon].name);
@@ -1480,9 +1520,9 @@ static void dg_render(void)
             wb2[4] = (char)('0' + rt.day % 10u);
             wb2[5] = 0;
             dg_text(DG_W - 70u, DG_H - DG_TASKBAR + dg_tb_txt_y(), tbuf,
-                    dg_rgb(0xF0,0xF0,0xF0), bar);
+                    dg_theme_c(1u), bar);
             dg_text(DG_W - 152u, DG_H - DG_TASKBAR + dg_tb_txt_y(), wb2,
-                    dg_rgb(0xA0,0xB0,0xC8), bar);
+                    dg_theme_c(7u), bar);
         } else {
             dg_text(DG_W - 70u, DG_H - DG_TASKBAR + dg_tb_txt_y(), "--:--:--",
                     dg_rgb(0xF0,0xF0,0xF0), bar);
@@ -2035,6 +2075,14 @@ void desk_gui_run(void)
         /* --- 全局字体缩放热键：F5 循环 1x/2x/3x --- */
         if (key == KEY_F5) {
             g_font_scale = (g_font_scale >= 3u) ? 1u : g_font_scale + 1u;
+            g_tb_h = 22u + 8u * g_font_scale;   /* 任务栏高度联动 */
+            dg_render();
+            continue;
+        }
+
+        /* --- 全局主题热键：F6 切换 深色/浅色 --- */
+        if (key == KEY_F6) {
+            g_theme = (g_theme == 0u) ? 1u : 0u;
             dg_render();
             continue;
         }
