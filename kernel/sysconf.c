@@ -41,9 +41,12 @@ static u32 sc_parse_u32(const char *s)
     return v;
 }
 
+static char sc_buf[SYSCONF_MAX];      /* 共享工作缓冲（内核镜像体积受限，避免重复 BSS） */
+static char sc_out[SYSCONF_MAX];
+
 u32 sysconf_get_u32(const char *key, u32 dflt)
 {
-    static char buf[SYSCONF_MAX];       /* static：避免内核大栈帧（__chkstk_ms） */
+    char *buf = sc_buf;
     char k[SYSCONF_KEYMAX];
     char *p, *eol, *eq;
     i32 total;
@@ -77,7 +80,7 @@ u32 sysconf_get_u32(const char *key, u32 dflt)
 
 int sysconf_set_u32(const char *key, u32 val)
 {
-    static char buf[SYSCONF_MAX];       /* static：避免内核大栈帧 */
+    char *buf = sc_buf;
     char line[SYSCONF_KEYMAX + 24u];
     char *p, *eol, *eq;
     u32 i, klen, n, llen;
@@ -111,7 +114,7 @@ int sysconf_set_u32(const char *key, u32 val)
     if (total < 0) return -1;
 
     {
-        static char out[SYSCONF_MAX];   /* static：避免内核大栈帧 */
+        char *out = sc_out;
         u32 o = 0u, replaced = 0u;
         p = buf;
         for (i = 0u; (u32)i < (u32)total && *p; ) {
@@ -154,7 +157,7 @@ int sysconf_set_u32(const char *key, u32 val)
 
 void sysconf_dump(void)
 {
-    static char buf[SYSCONF_MAX];       /* static：避免内核大栈帧 */
+    char *buf = sc_buf;
     i32 total = sysconf_read_all(buf, SYSCONF_MAX);
     con_puts("  sysconf: /disk/xos.conf");
     if (total <= 0) { con_puts(" (empty)\n"); return; }

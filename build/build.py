@@ -57,7 +57,7 @@ CFLAGS = [
     '-fno-asynchronous-unwind-tables', '-fno-unwind-tables',
     '-fno-omit-frame-pointer',   # 栈回溯：异常诊断依赖 EBP 帧链
     '-Wall', '-Wextra', '-Wno-unused-parameter',
-    '-O2', '-fno-inline-functions', '-fno-inline-small-functions',
+    '-Os', '-fno-inline-functions', '-fno-inline-small-functions',
     '-fno-inline-functions-called-once', '-I' + INCLUDE_DIR,
 ]
 

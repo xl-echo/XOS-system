@@ -29,6 +29,22 @@ extern void *memset(void *dst, int c, unsigned int n);
 
 /* ---------------- 桌面分辨率（随显示模式自适应） ---------------- */
 u32 g_dgw = 640u, g_dgh = 480u;
+u32 g_font_scale = 1u;      /* 全局字体缩放：1=8px 2=16px 3=24px */
+u32 g_tb_h = 30u;           /* 任务栏高度：随字体缩放自适应（1x=30 2x=38 3x=46） */
+
+static u32 dg_tb_txt_y(void)  /* 任务栏文字垂直居中偏移 */
+{
+    return (g_tb_h - 8u * g_font_scale) / 2u;
+}
+
+/* 字体缩放自动档位：随分辨率自适应（1280+ 放大 2x，1920+ 放大 3x） */
+void dg_font_scale_auto(void)
+{
+    if (DG_W >= 1920u) g_font_scale = 3u;
+    else if (DG_W >= 1280u) g_font_scale = 2u;
+    else g_font_scale = 1u;
+    g_tb_h = 22u + 8u * g_font_scale;   /* 任务栏高度随字体缩放 */
+}
 
 /* ---------------- 32bpp 帧缓冲访问 ---------------- */
 volatile u32 *dg_fb = (volatile u32 *)DG_LFB;
@@ -153,7 +169,7 @@ static const u8 dg_font8[96][8] = {
     {0x36,0x6C,0,0,0,0,0,0}, {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF},
 };
 
-static void dg_char(u32 x, u32 y, u8 ch, u32 fg, u32 bg)
+static void dg_char(u32 x, u32 y, u8 ch, u32 fg, u32 bg, u32 scale)
 {
     u32 i, j;
     const u8 *g;
@@ -165,7 +181,14 @@ static void dg_char(u32 x, u32 y, u8 ch, u32 fg, u32 bg)
     for (j = 0; j < 8u; j++)
         for (i = 0; i < 8u; i++) {
             u32 on = (g[j] >> (7u - i)) & 1u;
-            dgpix(x + i, y + j, on ? fg : bg);
+            if (scale <= 1u) {
+                dgpix(x + i, y + j, on ? fg : bg);
+            } else {
+                u32 px, py;
+                for (px = 0u; px < scale; px++)
+                    for (py = 0u; py < scale; py++)
+                        dgpix(x + i * scale + px, y + j * scale + py, on ? fg : bg);
+            }
         }
 }
 
@@ -173,8 +196,8 @@ void dg_text(u32 x, u32 y, const char *s, u32 fg, u32 bg)
 {
     if (!s) return;
     while (*s) {
-        dg_char(x, y, (u8)*s, fg, bg);
-        x += 8u;
+        dg_char(x, y, (u8)*s, fg, bg, g_font_scale);
+        x += 8u * g_font_scale;
         s++;
     }
 }
@@ -183,7 +206,7 @@ static u32 dg_text_w(const char *s)
 {
     u32 w = 0u;
     if (!s) return 0u;
-    while (*s) { w += 8u; s++; }
+    while (*s) { w += 8u * g_font_scale; s++; }
     return w;
 }
 
@@ -255,8 +278,8 @@ static void dg_icon_pattern(u32 x, u32 y, u32 idx)
         break;
     case 3u:   /* 终端：黑屏 + 绿色提示符 */
         dg_fill(x + 4u, y + 4u, 24u, 24u, c1);
-        dg_char(x + 8u, y + 12u, '>', c2, c1);
-        dg_char(x + 16u, y + 12u, '_', c2, c1);
+        dg_char(x + 8u, y + 12u, '>', c2, c1, g_font_scale);
+        dg_char(x + 16u, y + 12u, '_', c2, c1, g_font_scale);
         break;
     case 4u:   /* 浏览器：蓝圆环（矩形近似） + 白十字 */
         dg_fill(x + 6u, y + 6u, 20u, 20u, c2);
@@ -289,7 +312,7 @@ static void dg_icon_pattern(u32 x, u32 y, u32 idx)
         dg_fill(x + 6u, y + 6u, 20u, 20u, c2);
         dg_fill(x + 12u, y + 10u, 8u, 8u, c1);
         dg_fill(x + 6u, y + 22u, 20u, 4u, c3);
-        dg_char(x + 10u, y + 12u, '1', c3, c2);
+        dg_char(x + 10u, y + 12u, '1', c3, c2, g_font_scale);
         break;
     case 9u:   /* 时钟：圆盘 + 指针 */
         dg_fill(x + 8u, y + 8u, 16u, 16u, c2);
@@ -1333,7 +1356,7 @@ static void dg_window_draw(const dg_win_t *w)
     dg_rect(w->x, w->y, w->w, w->h, dg_rgb(0x0A,0x14,0x22));
     /* 关闭按钮 X */
     dg_fill(w->x + w->w - 24u, w->y + 5u, 18u, 16u, dg_rgb(0xC0,0x30,0x30));
-    dg_char(w->x + w->w - 20u, w->y + 9u, 'X', dg_rgb(0xFF,0xFF,0xFF), dg_rgb(0xC0,0x30,0x30));
+    dg_char(w->x + w->w - 20u, w->y + 9u, 'X', dg_rgb(0xFF,0xFF,0xFF), dg_rgb(0xC0,0x30,0x30), g_font_scale);
     /* 最小化按钮 _ */
     dg_fill(w->x + w->w - 48u, w->y + 5u, 18u, 16u, dg_rgb(0x3A,0x5A,0x8A));
     dg_fill(w->x + w->w - 43u, w->y + 16u, 8u, 2u, dg_rgb(0xF0,0xF0,0xF0));
@@ -1362,15 +1385,24 @@ static void dg_render(void)
         }
     }
 
-    /* 2) 图标：按分辨率自适应网格（1024 宽=10 列 3 行，640 宽=6 列 4 行） */
+    /* 2) 图标：按分辨率+字体缩放自适应网格（列宽=图标96+文字宽度、行距随字高缩放） */
     {
-        u32 cols = DG_W / 100u;
-        u32 rows = (DG_ICON_N + cols - 1u) / cols;
+        u32 cw = 96u, rh = 94u, cols;
+        u32 maxw = 0u;
+        u32 j;
+        for (j = 0u; j < DG_ICON_N; j++) {
+            u32 tw = dg_text_w(dg_icons[j].name);
+            if (tw > maxw) maxw = tw;
+        }
+        if (maxw + 28u > cw) cw = maxw + 28u;          /* 文字自适应列宽 */
+        rh = 36u + 16u + 8u * g_font_scale + 34u;      /* 行距随字体缩放 */
+        cols = DG_W / cw;
+        if (cols < 1u) cols = 1u;
         for (i = 0u; i < DG_ICON_N; i++) {
             u32 col = i % cols;
             u32 row = i / cols;
-            x = 24u + col * 100u;
-            y = 40u + row * 94u;
+            x = 24u + col * cw;
+            y = 40u + row * rh;
             dg_icon_pattern(x, y, dg_icons[i].icon);
             if (i == dg_sel && dg_nwin == 0u)
                 dg_rect(x - 3u, y - 3u, 38u, 38u, sel_c);
@@ -1402,10 +1434,10 @@ static void dg_render(void)
     dg_fill(0u, DG_H - DG_TASKBAR, DG_W, DG_TASKBAR, bar);
     dg_fill(0u, DG_H - DG_TASKBAR, DG_W, 2u, dg_rgb(0x2E,0x3A,0x4E));
     /* 开始按钮 */
-    dg_fill(6u, DG_H - DG_TASKBAR + 5u, 56u, 20u, dg_rgb(0x2F,0x7D,0xE1));
-    dg_text(14u, DG_H - DG_TASKBAR + 11u, "XOS", dg_rgb(0xFF,0xFF,0xFF), dg_rgb(0x2F,0x7D,0xE1));
+    dg_fill(6u, DG_H - DG_TASKBAR + (g_tb_h - 20u) / 2u, 56u, 20u, dg_rgb(0x2F,0x7D,0xE1));
+    dg_text(14u, DG_H - DG_TASKBAR + dg_tb_txt_y(), "XOS", dg_rgb(0xFF,0xFF,0xFF), dg_rgb(0x2F,0x7D,0xE1));
     /* 桌面版本标识 */
-    dg_text(78u, DG_H - DG_TASKBAR + 11u, "v1.0", dg_rgb(0x60,0x70,0x88), bar);
+    dg_text(78u, DG_H - DG_TASKBAR + dg_tb_txt_y(), "v1.0", dg_rgb(0x60,0x70,0x88), bar);
     /* 最小化窗口的恢复按钮（点击概念：按对应数字键恢复） */
     if (dg_nwin > 0u) {
         u32 rbx = 300u;
@@ -1413,20 +1445,20 @@ static void dg_render(void)
             if (dg_wins[i].open) {
                 u32 col = dg_wins[i].min ? dg_rgb(0x2A,0x4A,0x6A)
                         : (i == dg_focus) ? dg_rgb(0x2F,0x7D,0xE1) : dg_rgb(0x2E,0x3E,0x52);
-                dg_fill(rbx, DG_H - DG_TASKBAR + 6u, 40u, 18u, col);
+                dg_fill(rbx, DG_H - DG_TASKBAR + (g_tb_h - 18u) / 2u, 40u, 18u, col);
                 dg_name2(tbuf, dg_icons[dg_wins[i].icon].name);
-                dg_text(rbx + 6u, DG_H - DG_TASKBAR + 12u, tbuf,
+                dg_text(rbx + 6u, DG_H - DG_TASKBAR + dg_tb_txt_y(), tbuf,
                         dg_rgb(0xE8,0xE8,0xE8), bar);
                 rbx += 46u;
             }
         }
     }
     /* 系统托盘：网络 + 音量 + 电池 + 通知角标 */
-    dg_fill(DG_W - 150u, DG_H - DG_TASKBAR + 9u, 10u, 10u, dg_rgb(0x30,0xC0,0x50));   /* 网络绿点 */
-    dg_fill(DG_W - 128u, DG_H - DG_TASKBAR + 8u, 12u, 12u, dg_rgb(0xE0,0xB0,0x40));   /* 音量 */
-    dg_fill(DG_W - 128u, DG_H - DG_TASKBAR + 10u, 2u, 8u, dg_rgb(0xE0,0xB0,0x40));
-    dg_rect(DG_W - 108u, DG_H - DG_TASKBAR + 8u, 14u, 12u, dg_rgb(0x80,0xE0,0x90));    /* 电池 */
-    dg_fill(DG_W - 108u, DG_H - DG_TASKBAR + 8u, 10u, 12u, dg_rgb(0x20,0x50,0x30));
+    dg_fill(DG_W - 150u, DG_H - DG_TASKBAR + (g_tb_h - 10u) / 2u, 10u, 10u, dg_rgb(0x30,0xC0,0x50));   /* 网络绿点 */
+    dg_fill(DG_W - 128u, DG_H - DG_TASKBAR + (g_tb_h - 12u) / 2u, 12u, 12u, dg_rgb(0xE0,0xB0,0x40));   /* 音量 */
+    dg_fill(DG_W - 128u, DG_H - DG_TASKBAR + (g_tb_h - 8u) / 2u, 2u, 8u, dg_rgb(0xE0,0xB0,0x40));
+    dg_rect(DG_W - 108u, DG_H - DG_TASKBAR + (g_tb_h - 12u) / 2u, 14u, 12u, dg_rgb(0x80,0xE0,0x90));    /* 电池 */
+    dg_fill(DG_W - 108u, DG_H - DG_TASKBAR + (g_tb_h - 12u) / 2u, 10u, 12u, dg_rgb(0x20,0x50,0x30));
     /* 时钟：真实 CMOS RTC（日期 + 时:分:秒） */
     {
         char wb2[16];
@@ -1447,12 +1479,12 @@ static void dg_render(void)
             wb2[3] = (char)('0' + rt.day / 10u);
             wb2[4] = (char)('0' + rt.day % 10u);
             wb2[5] = 0;
-            dg_text(DG_W - 70u, DG_H - DG_TASKBAR + 11u, tbuf,
+            dg_text(DG_W - 70u, DG_H - DG_TASKBAR + dg_tb_txt_y(), tbuf,
                     dg_rgb(0xF0,0xF0,0xF0), bar);
-            dg_text(DG_W - 152u, DG_H - DG_TASKBAR + 11u, wb2,
+            dg_text(DG_W - 152u, DG_H - DG_TASKBAR + dg_tb_txt_y(), wb2,
                     dg_rgb(0xA0,0xB0,0xC8), bar);
         } else {
-            dg_text(DG_W - 70u, DG_H - DG_TASKBAR + 11u, "--:--:--",
+            dg_text(DG_W - 70u, DG_H - DG_TASKBAR + dg_tb_txt_y(), "--:--:--",
                     dg_rgb(0xF0,0xF0,0xF0), bar);
         }
     }
@@ -1535,6 +1567,9 @@ int desk_gui_init(void)
         g_dgw = dm.width; g_dgh = dm.height;
     }
     con_printf("  [desk_gui] desktop %ux%ux32 (mode %u)\n", g_dgw, g_dgh, m_idx);
+    con_flush();
+    dg_font_scale_auto();             /* 字体缩放随分辨率自适应 */
+    con_printf("  [desk_gui] font scale %ux\n", g_font_scale);
     con_flush();
     if (vmm_map_device_huge(vmm_kernel_mm(), DG_LFB, DG_LFB, PTE_P | PTE_RW) != VMM_OK) {
         con_puts("  [desk_gui] huge device map failed, fallback 4KB pages\n");
@@ -1991,8 +2026,16 @@ void desk_gui_run(void)
                 disp_mode_t dm;
                 if (display_get_mode(mi, &dm) == 0) { g_dgw = dm.width; g_dgh = dm.height; }
                 sysconf_set_u32("screen.mode", mi);   /* 分辨率记忆恢复 */
+                dg_font_scale_auto();                 /* 字体随分辨率重算档位 */
                 dg_render();
             }
+            continue;
+        }
+
+        /* --- 全局字体缩放热键：F5 循环 1x/2x/3x --- */
+        if (key == KEY_F5) {
+            g_font_scale = (g_font_scale >= 3u) ? 1u : g_font_scale + 1u;
+            dg_render();
             continue;
         }
 
