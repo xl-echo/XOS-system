@@ -467,6 +467,7 @@ static u32  dg_move_mode = 0u; /* 移动模式 */
 #define DG_MENU_START  1u
 #define DG_MENU_RIGHT  2u
 static u32  dg_menu    = DG_MENU_NONE;
+static u32  dg_help_ov = 0u;             /* 全局 F1 帮助浮层 */
 static u32  dg_wx_idx  = 0u;              /* 天气：0晴 1多云 2雨 3雪 */
 static u32  dg_set_page = 0u;            /* 设置中心页签：0概览 1驱动 2存储 3关于 */
 static u32  dg_mu_vol   = 60u;           /* 音乐音量 0-100 */
@@ -1627,6 +1628,39 @@ static void dg_render(void)
         dg_text(wx + ww / 2u - 88u, wy + wh - 24u, "Press Enter to start", dg_rgb(0x30,0xC0,0x50), mbg);
     }
 
+    /* 5.6) 全局帮助浮层（F1）：快捷键全景 + 应用清单（用户习惯贴合） */
+    if (dg_help_ov) {
+        u32 hx = 20u, hy = 18u, hw2 = DG_W - 40u, hh2 = DG_H - DG_TASKBAR - 30u;
+        u32 mbg = dg_theme_c(8u), mfr = dg_theme_c(7u);
+        static const char *lines[15] = {
+            "XOS Help (F1 close)",
+            "Keys:  Tab/Arrows select icon   Enter open",
+            "  Esc close   S start menu   R right menu",
+            "  M move   N minimize   Backspace back",
+            "  F2/F3/F4 resolution 640/800/1024",
+            "  F5 font 1x/2x/3x   F6 dark/light theme",
+            "  F7 mute   F8 volume-   F9 volume+",
+            "  P pause music   L next track",
+            "Apps: 1-9,0 open first ten apps",
+            "  Files Note Calc Term Web Settings",
+            "  Music Games Photos Clock Monit",
+            "  Weather Tasks Pkgs Pics Shot Video",
+            "  PDF Code Search Help Boot Text Mail",
+            "Clock: real RTC   Mem: real pmm usage",
+            "",
+        };
+        u32 ln;
+        if (hw2 > 600u) hw2 = 600u;
+        dg_fill(hx, hy, hw2, hh2, mbg);
+        dg_rect(hx, hy, hw2, hh2, mfr);
+        dg_fill(hx, hy, hw2, 22u, dg_rgb(0x1E,0x6F,0xD0));
+        dg_text(hx + 8u, hy + 7u, lines[0], dg_rgb(0xFF,0xFF,0xFF), dg_rgb(0x1E,0x6F,0xD0));
+        for (ln = 1u; ln < 15u; ln++)
+            dg_text(hx + 10u, hy + 22u + (ln - 1u) * 14u, lines[ln],
+                    (ln == 1u) ? dg_rgb(0x50,0xC0,0x70) : dg_theme_c(1u), mbg);
+        dg_text(hx + 10u, hy + hh2 - 18u, "Press F1 or Esc to close", dg_rgb(0xE0,0xB0,0x40), mbg);
+    }
+
     /* 6) 右键菜单浮层 */
     if (dg_menu == DG_MENU_RIGHT) {
         static const char *ritems[3] = { "Open", "Properties", "Close" };
@@ -2180,6 +2214,19 @@ void desk_gui_run(void)
         if (key == KEY_F6) {
             g_theme = (g_theme == 0u) ? 1u : 0u;
             dg_render();
+            continue;
+        }
+
+        /* --- 全局帮助浮层：F1 开关 --- */
+        if (key == KEY_F1) {
+            dg_help_ov = (dg_help_ov == 0u) ? 1u : 0u;
+            dg_render();
+            continue;
+        }
+
+        /* 帮助浮层打开时：Esc 关闭，其余忽略 */
+        if (dg_help_ov) {
+            if (key == KEY_ESC) { dg_help_ov = 0u; dg_render(); }
             continue;
         }
 
