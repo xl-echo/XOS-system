@@ -85,6 +85,11 @@ volatile u32 *dg_fb = (volatile u32 *)DG_LFB;
 static u32 dg_sel = 0u;
 static void dg_itoa(int v, char *out);
 
+/* 系统监视接口（pmm/task，真实数据） */
+extern u32 pmm_total_pages(void);
+extern u32 pmm_used_pages(void);
+#include "task.h"
+
 /* 音乐播放器状态 */
 static u32 dg_mu_play = 0u;      /* 播放中 */
 static u32 dg_mu_track = 0u;     /* 当前曲目 0-2 */
@@ -1493,6 +1498,38 @@ static void dg_render(void)
             }
         }
     }
+    /* 系统监视：内存占用条（真实 pmm 数据）+ 进程数（真实调度数据） */
+    {
+        static u32 dbg_once = 0u;
+        u32 tp = pmm_total_pages();
+        u32 up = pmm_used_pages();
+        u32 fp = pmm_free_page_count();
+        u32 pct = (tp > 0u) ? (((tp - fp) * 100u) / tp) : 0u;
+        if (!dbg_once) {
+            dbg_once = 1u;
+            con_printf("  [desk_gui] mem tp=%u up=%u fp=%u pct=%u\n", tp, up, fp, pct);
+            con_flush();
+        }
+        u32 bx = DG_W - 236u;
+        u32 by = DG_H - DG_TASKBAR + (g_tb_h - 12u) / 2u;
+        u32 c1 = (pct < 70u) ? dg_rgb(0x30,0xC0,0x50)
+             : (pct < 90u) ? dg_rgb(0xE0,0xB0,0x40) : dg_rgb(0xE0,0x48,0x48);
+        dg_rect(bx, by, 34u, 12u, dg_theme_c(7u));
+        if (pct > 0u) dg_fill(bx + 1u, by + 1u, (34u - 2u) * pct / 100u, 10u, c1);
+        if (pct > 0u && (34u - 2u) * pct / 100u >= 34u) dg_fill(bx + 1u, by + 1u, 32u, 10u, c1);
+        tbuf[0] = (char)('0' + pct / 10u % 10u);
+        tbuf[1] = (char)('0' + pct % 10u);
+        tbuf[2] = '%';
+        tbuf[3] = ' ';
+        tbuf[4] = 'P';
+        {
+            task_stats_t st;
+            task_stats(&st);
+            tbuf[5] = (char)('0' + (st.task_count % 10u));
+        }
+        tbuf[6] = 0;
+        dg_text(bx + 38u, DG_H - DG_TASKBAR + dg_tb_txt_y(), tbuf, dg_theme_c(1u), bar);
+    }
     /* 系统托盘：网络 + 音量 + 电池 + 通知角标 */
     dg_fill(DG_W - 150u, DG_H - DG_TASKBAR + (g_tb_h - 10u) / 2u, 10u, 10u, dg_rgb(0x30,0xC0,0x50));   /* 网络绿点 */
     dg_fill(DG_W - 128u, DG_H - DG_TASKBAR + (g_tb_h - 12u) / 2u, 12u, 12u, dg_rgb(0xE0,0xB0,0x40));   /* 音量 */
@@ -1533,34 +1570,36 @@ static void dg_render(void)
     if (dg_menu == DG_MENU_START) {
         u32 mx = 6u, my = DG_H - DG_TASKBAR - 24u * 14u - 18u;
         u32 mw = 210u, mh = 24u * 14u + 18u;
+        u32 mbg = dg_theme_c(8u), mfr = dg_theme_c(7u);
         if (my < 8u) my = 8u;
-        dg_fill(mx, my, mw, mh, dg_rgb(0x22,0x2A,0x38));
-        dg_rect(mx, my, mw, mh, dg_rgb(0x4A,0x5A,0x78));
-        dg_text(mx + 8u, my + 4u, "XOS Applications (24)", dg_rgb(0x80,0xC0,0xF0), dg_rgb(0x22,0x2A,0x38));
+        dg_fill(mx, my, mw, mh, mbg);
+        dg_rect(mx, my, mw, mh, mfr);
+        dg_text(mx + 8u, my + 4u, "XOS Applications (24)", dg_rgb(0x50,0xA8,0xE8), mbg);
         for (i = 0u; i < DG_ICON_N; i++) {
             u32 iy = my + 18u + i * 14u;
             if (i == dg_menusel) dg_fill(mx + 4u, iy, mw - 8u, 12u, dg_rgb(0x2F,0x7D,0xE1));
             dg_text(mx + 10u, iy + 3u, dg_apps[i],
-                    i == dg_menusel ? dg_rgb(0xFF,0xFF,0xFF) : dg_rgb(0xD0,0xD8,0xE0),
-                    i == dg_menusel ? dg_rgb(0x2F,0x7D,0xE1) : dg_rgb(0x22,0x2A,0x38));
+                    i == dg_menusel ? dg_rgb(0xFF,0xFF,0xFF) : dg_theme_c(1u),
+                    i == dg_menusel ? dg_rgb(0x2F,0x7D,0xE1) : mbg);
         }
         dg_text(mx + 8u, my + mh - 14u, "Up/Dn select  Enter start  Esc close",
-                dg_rgb(0x90,0xA0,0xB8), dg_rgb(0x22,0x2A,0x38));
+                dg_theme_c(7u), mbg);
     }
 
     /* 5.5) 首次使用欢迎弹窗 */
     if (dg_welcome) {
         u32 wx = 60u, wy = 70u, ww = DG_W - 120u, wh = 190u;
-        dg_fill(wx, wy, ww, wh, dg_rgb(0x22,0x2A,0x38));
+        u32 mbg = dg_theme_c(8u);
+        dg_fill(wx, wy, ww, wh, mbg);
         dg_rect(wx, wy, ww, wh, dg_rgb(0x58,0x88,0xC0));
         dg_fill(wx, wy, ww, 26u, dg_rgb(0x1E,0x6F,0xD0));
         dg_text(wx + 10u, wy + 9u, "Welcome to XOS", dg_rgb(0xFF,0xFF,0xFF), dg_rgb(0x1E,0x6F,0xD0));
-        dg_text(wx + 16u, wy + 44u, "Tab select icon, Enter open app", dg_rgb(0xD0,0xD8,0xE0), dg_rgb(0x22,0x2A,0x38));
-        dg_text(wx + 16u, wy + 68u, "S Start menu   R Right menu", dg_rgb(0xD0,0xD8,0xE0), dg_rgb(0x22,0x2A,0x38));
-        dg_text(wx + 16u, wy + 92u, "M move   N minimize   Esc close", dg_rgb(0xD0,0xD8,0xE0), dg_rgb(0x22,0x2A,0x38));
-        dg_text(wx + 16u, wy + 116u, "Start menu: 24 apps", dg_rgb(0xD0,0xD8,0xE0), dg_rgb(0x22,0x2A,0x38));
-        dg_text(wx + 16u, wy + 140u, "Note editor saves to /note.txt", dg_rgb(0xD0,0xD8,0xE0), dg_rgb(0x22,0x2A,0x38));
-        dg_text(wx + ww / 2u - 88u, wy + wh - 24u, "Press Enter to start", dg_rgb(0x30,0xC0,0x50), dg_rgb(0x22,0x2A,0x38));
+        dg_text(wx + 16u, wy + 44u, "Tab select icon, Enter open app", dg_theme_c(1u), mbg);
+        dg_text(wx + 16u, wy + 68u, "S Start menu   R Right menu", dg_theme_c(1u), mbg);
+        dg_text(wx + 16u, wy + 92u, "M move   N minimize   Esc close", dg_theme_c(1u), mbg);
+        dg_text(wx + 16u, wy + 116u, "Start menu: 24 apps", dg_theme_c(1u), mbg);
+        dg_text(wx + 16u, wy + 140u, "Note editor saves to /note.txt", dg_theme_c(1u), mbg);
+        dg_text(wx + ww / 2u - 88u, wy + wh - 24u, "Press Enter to start", dg_rgb(0x30,0xC0,0x50), mbg);
     }
 
     /* 6) 右键菜单浮层 */
@@ -1569,14 +1608,15 @@ static void dg_render(void)
         u32 cols = DG_W / 100u;
         u32 rx = 24u + (dg_sel % cols) * 100u + 30u;
         u32 ry = 40u + (dg_sel / cols) * 94u + 10u;
-        dg_fill(rx, ry, 150u, 66u, dg_rgb(0x22,0x2A,0x38));
-        dg_rect(rx, ry, 150u, 66u, dg_rgb(0x4A,0x5A,0x78));
+        u32 mbg = dg_theme_c(8u), mfr = dg_theme_c(7u);
+        dg_fill(rx, ry, 150u, 66u, mbg);
+        dg_rect(rx, ry, 150u, 66u, mfr);
         for (i = 0u; i < 3u; i++) {
             u32 iy = ry + 6u + i * 20u;
             if (i == dg_menusel) dg_fill(rx + 4u, iy, 142u, 18u, dg_rgb(0x2F,0x7D,0xE1));
             dg_text(rx + 10u, iy + 5u, ritems[i],
-                    i == dg_menusel ? dg_rgb(0xFF,0xFF,0xFF) : dg_rgb(0xD0,0xD8,0xE0),
-                    i == dg_menusel ? dg_rgb(0x2F,0x7D,0xE1) : dg_rgb(0x22,0x2A,0x38));
+                    i == dg_menusel ? dg_rgb(0xFF,0xFF,0xFF) : dg_theme_c(1u),
+                    i == dg_menusel ? dg_rgb(0x2F,0x7D,0xE1) : mbg);
         }
     }
 
