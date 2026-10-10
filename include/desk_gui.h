@@ -1,20 +1,24 @@
 /* ============================================================================
  * XOS 图形桌面（真机 GUI 层）接口
- * 完全自研：Bochs VBE 640x480x32 帧缓冲 + 桌面渲染 + 键盘事件循环。
+ * 完全自研：Bochs VBE 帧缓冲 + 桌面渲染 + 键盘事件循环。
+ * 分辨率自适应：DG_W/DG_H 为运行时变量，随显示模式(1024x768/800x600/640x480)
+ * 自动变化，桌面图标网格、任务栏、托盘、时钟等布局按实际分辨率重排。
  * ========================================================================== */
 #ifndef XOS_DESK_GUI_H
 #define XOS_DESK_GUI_H
 
 #include "types.h"
 
-#define DG_W          640u
-#define DG_H          480u
-#define DG_LFB        0xE0000000u      /* Bochs VBE 线性帧缓冲基址 */
-#define DG_TASKBAR    30u              /* 任务栏高度（像素） */
-#define DG_ICON_N     24u              /* 桌面图标数量（含三期 12 新应用） */
+#define DG_W          g_dgw          /* 实际桌面宽度（自适应） */
+#define DG_H          g_dgh          /* 实际桌面高度（自适应） */
+#define DG_LFB        0xE0000000u    /* Bochs VBE 线性帧缓冲基址 */
+#define DG_TASKBAR    30u            /* 任务栏高度（像素） */
+#define DG_ICON_N     24u            /* 桌面图标数量（含三期 12 新应用） */
 
-int  desk_gui_init(void);              /* 切 VBE 640x480x32 + 映射 LFB；0=成功 */
-void desk_gui_run(void);               /* 渲染桌面 + 事件循环；Esc 退出回文本 Shell */
+extern u32 g_dgw, g_dgh;             /* 当前桌面分辨率（desk_gui 初始化时按模式设置） */
+
+int  desk_gui_init(void);            /* 切 VBE 1024x768x32 + 映射 LFB；0=成功 */
+void desk_gui_run(void);             /* 渲染桌面 + 事件循环；Esc 退出回文本 Shell */
 /* 首次使用欢迎向导（首登创建账户后置位，Enter 关闭） */
 extern u32 dg_welcome;
 

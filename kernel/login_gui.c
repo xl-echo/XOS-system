@@ -84,6 +84,9 @@ static void lg_draw(void)
     u32 box_f = dg_rgb(0x3A, 0x5A, 0x80);
     u32 box_h = dg_rgb(0x50, 0x90, 0xD0);
     u32 dim = dg_rgb(0x90, 0xA0, 0xB8);
+    /* 面板居中偏移：1024x768 等大分辨率下登录面板自动居中 */
+    u32 ox = (DG_W > 640u) ? (DG_W - 480u) / 2u - 80u : 0u;
+    u32 oy = (DG_H > 480u) ? (DG_H - 330u) / 2u - 60u : 0u;
 
     /* 设计稿登录背景（320x240 拉伸） */
     for (y = 0u; y < DG_H; y++) {
@@ -94,46 +97,46 @@ static void lg_draw(void)
         }
     }
     /* 面板 */
-    dg_fill(80u, 60u, 480u, 330u, panel);
-    dg_rect(80u, 60u, 480u, 330u, dg_rgb(0x3A, 0x50, 0x74));
+    dg_fill(80u + ox, 60u + oy, 480u, 330u, panel);
+    dg_rect(80u + ox, 60u + oy, 480u, 330u, dg_rgb(0x3A, 0x50, 0x74));
     /* 标题 */
-    dg_text(270u, 80u, "XOS", title, panel);
-    dg_text(190u, 110u, first ? "首次使用 · 创建管理员账户" : "用户登录",
+    dg_text(270u + ox, 80u + oy, "XOS", title, panel);
+    dg_text(190u + ox, 110u + oy, first ? "First Use - Create Admin" : "User Login",
             fg, panel);
 
     /* 输入框 */
-    dg_text(130u, 160u, "用户名", dim, panel);
-    dg_fill(210u, 156u, 280u, 26u, box_bg);
-    dg_rect(210u, 156u, 280u, 26u, lg_focus == 0u ? box_h : box_f);
+    dg_text(130u + ox, 160u + oy, "Username", dim, panel);
+    dg_fill(210u + ox, 156u + oy, 280u, 26u, box_bg);
+    dg_rect(210u + ox, 156u + oy, 280u, 26u, lg_focus == 0u ? box_h : box_f);
     for (i = 0u; i < 15u; i++) {
         char ch[2];
         if (lg_name[i] == 0) break;
         ch[0] = lg_name[i]; ch[1] = 0;
-        dg_text(216u + i * 9u, 163u, ch, fg, box_bg);
+        dg_text(216u + ox + i * 9u, 163u + oy, ch, fg, box_bg);
     }
-    dg_text(130u, 200u, "密码", dim, panel);
-    dg_fill(210u, 196u, 280u, 26u, box_bg);
-    dg_rect(210u, 196u, 280u, 26u, lg_focus == 1u ? box_h : box_f);
+    dg_text(130u + ox, 200u + oy, "Password", dim, panel);
+    dg_fill(210u + ox, 196u + oy, 280u, 26u, box_bg);
+    dg_rect(210u + ox, 196u + oy, 280u, 26u, lg_focus == 1u ? box_h : box_f);
     for (i = 0u; i < 31u; i++) {
         if (lg_pass[i] == 0) break;
-        dg_fill(218u + i * 9u, 204u, 5u, 10u, fg);   /* 掩码圆点 */
+        dg_fill(218u + ox + i * 9u, 204u + oy, 5u, 10u, fg);   /* 掩码圆点 */
     }
     if (first) {
-        dg_text(130u, 240u, "确认密码", dim, panel);
-        dg_fill(210u, 236u, 280u, 26u, box_bg);
-        dg_rect(210u, 236u, 280u, 26u, lg_focus == 2u ? box_h : box_f);
+        dg_text(130u + ox, 240u + oy, "Confirm", dim, panel);
+        dg_fill(210u + ox, 236u + oy, 280u, 26u, box_bg);
+        dg_rect(210u + ox, 236u + oy, 280u, 26u, lg_focus == 2u ? box_h : box_f);
         for (i = 0u; i < 31u; i++) {
             if (lg_confirm[i] == 0) break;
-            dg_fill(218u + i * 9u, 244u, 5u, 10u, fg);
+            dg_fill(218u + ox + i * 9u, 244u + oy, 5u, 10u, fg);
         }
     }
     /* 状态行 */
-    dg_text(130u, 285u, lg_status, lg_status_c, panel);
+    dg_text(130u + ox, 285u + oy, lg_status, lg_status_c, panel);
     /* 提示 */
-    dg_text(130u, 320u, "[Tab] 切换输入  [回车] 登录  [退格] 删除",
+    dg_text(130u + ox, 320u + oy, "[Tab] switch  [Enter] login  [BkSp] del",
             dim, panel);
-    dg_text(130u, 340u, "[Esc] 切换文本模式登录", dim, panel);
-    dg_text(130u, 366u, "XOS v1.0 · 完全自研 · 连续5次失败将锁定账户",
+    dg_text(130u + ox, 340u + oy, "[Esc] text-mode login", dim, panel);
+    dg_text(130u + ox, 366u + oy, "XOS v1.0 self-built - 5 fails locks account",
             dg_rgb(0x60, 0x78, 0x98), panel);
 }
 
@@ -143,20 +146,20 @@ static int lg_submit(void)
     u32 uid = 0u;
     char token[24];
     if (lg_remaining() > 0u) {
-        lg_set_status("账户锁定中，请稍候...", dg_rgb(0xFF, 0x60, 0x60));
+        lg_set_status("Account locked, please wait...", dg_rgb(0xFF, 0x60, 0x60));
         return 1;
     }
-    if (lg_name[0] == 0) { lg_set_status("请输入用户名", dg_rgb(0xFF, 0x60, 0x60)); return 1; }
-    if (lg_pass[0] == 0) { lg_set_status("请输入密码", dg_rgb(0xFF, 0x60, 0x60)); return 1; }
+    if (lg_name[0] == 0) { lg_set_status("Enter username", dg_rgb(0xFF, 0x60, 0x60)); return 1; }
+    if (lg_pass[0] == 0) { lg_set_status("Enter password", dg_rgb(0xFF, 0x60, 0x60)); return 1; }
     if (lg_flags & LG_FIRST) {
         if (strcmp(lg_pass, lg_confirm) != 0) {
-            lg_set_status("两次密码输入不一致", dg_rgb(0xFF, 0x60, 0x60));
+            lg_set_status("Passwords do not match", dg_rgb(0xFF, 0x60, 0x60));
             lg_clear(lg_pass, LG_PASS_LEN);
             lg_clear(lg_confirm, LG_PASS_LEN);
             return 1;
         }
         if (mu_user_add(lg_name, lg_pass, 0u, &uid) != 0) {
-            lg_set_status("创建管理员账户失败（名称可能已存在）", dg_rgb(0xFF, 0x60, 0x60));
+            lg_set_status("Create admin failed (name exists)", dg_rgb(0xFF, 0x60, 0x60));
             lg_clear(lg_name, LG_NAME_LEN);
             lg_clear(lg_pass, LG_PASS_LEN);
             lg_clear(lg_confirm, LG_PASS_LEN);
@@ -164,13 +167,13 @@ static int lg_submit(void)
         }
         mu_session_open(uid, token, sizeof(token));
         dg_welcome = 1u;                 /* 首次使用欢迎向导 */
-        lg_set_status("管理员账户创建成功，正在进入系统...", dg_rgb(0x60, 0xE0, 0x80));
+        lg_set_status("Admin created, entering system...", dg_rgb(0x60, 0xE0, 0x80));
         return 0;
     }
     if (mu_authenticate(lg_name, lg_pass, &uid) == 0) {
         lg_fails = 0u;
         mu_session_open(uid, token, sizeof(token));
-        lg_set_status("登录成功，正在进入系统...", dg_rgb(0x60, 0xE0, 0x80));
+        lg_set_status("Login OK, entering system...", dg_rgb(0x60, 0xE0, 0x80));
         return 0;
     }
     lg_fails++;
@@ -178,11 +181,11 @@ static int lg_submit(void)
         mu_user_lock(uid, 1u);
         lg_lock_uid = uid;
         lg_locked_tick = pit_tick_count();
-        lg_set_status("连续5次失败，账户已锁定（30秒后自动解锁）", dg_rgb(0xFF, 0x60, 0x60));
+        lg_set_status("5 fails - locked (unlock 30s)", dg_rgb(0xFF, 0x60, 0x60));
     } else {
         char nb[48];
         u32 i = 0u;
-        const char *s = "用户名或密码错误，剩余 ";
+        const char *s = "Wrong user or password, left ";
         while (s[i] && i < 30u) { nb[i] = s[i]; i++; }
         nb[i++] = (char)('0' + (LG_FAIL_MAX - lg_fails));
         nb[i++] = ' ';
