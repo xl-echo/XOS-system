@@ -1384,6 +1384,12 @@ static void dg_window_draw(const dg_win_t *w)
     u32 body  = dg_theme_c(3u);
     u32 frm   = dg_theme_c(4u);
     const char *name = dg_icons[w->icon].name;
+    /* 投影阴影（右/下 4px，制造层次感；先画阴影再画窗体） */
+    if (g_theme == 1u) {
+        dg_fill(w->x + 4u, w->y + 4u, w->w, w->h, dg_rgb(0x50,0x58,0x60));
+    } else {
+        dg_fill(w->x + 4u, w->y + 4u, w->w, w->h, dg_rgb(0x0A,0x10,0x1C));
+    }
     dg_fill(w->x, w->y, w->w, w->h, body);
     dg_fill(w->x, w->y, w->w, 26u, title);
     /* 左侧应用色条（直观识别应用类别） */
@@ -1474,6 +1480,22 @@ static void dg_render(void)
         wb[5] = ':'; wb[6] = (char)('0' + ts / 10u); wb[7] = (char)('0' + ts % 10u); wb[8] = 0;
         dg_fill(DG_W - 144u, 4u, dg_text_w(wb) * 2u, 14u, dg_theme_c(6u));
         dg_text(DG_W - 142u, 6u, wb, dg_theme_c(1u), dg_theme_c(6u));
+    }
+    /* 3.5) 图标选中提示条（顶部居中：应用名 + 操作提示，普通用户可直接识别） */
+    if (dg_nwin == 0u && dg_menu == 0u) {
+        char hint[24];
+        u32 hi = 0u, q;
+        const char *nm = dg_icons[dg_sel].name;
+        while (nm[hi] && hi < 15u) { hint[hi] = nm[hi]; hi++; }
+        hint[hi++] = ' '; hint[hi++] = '-'; hint[hi++] = ' ';
+        { const char *t = "Enter open  R menu"; for (q = 0u; t[q] && hi < 22u; q++) hint[hi++] = t[q]; }
+        hint[hi] = 0;
+        {
+            u32 hw = dg_text_w(hint);
+            u32 hx = (DG_W > hw + 24u) ? (DG_W - hw) / 2u : 4u;
+            dg_fill(hx, 26u, hw + 8u, 14u, g_theme == 1u ? dg_rgb(0xE0,0xE6,0xEC) : dg_rgb(0x0E,0x22,0x40));
+            dg_text(hx + 4u, 28u, hint, dg_theme_c(1u), g_theme == 1u ? dg_rgb(0xE0,0xE6,0xEC) : dg_rgb(0x0E,0x22,0x40));
+        }
     }
     /* 4) 任务栏 */
     dg_fill(0u, DG_H - DG_TASKBAR, DG_W, DG_TASKBAR, bar);
