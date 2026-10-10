@@ -34,10 +34,25 @@ u32 g_tb_h = 30u;           /* 任务栏高度：随字体缩放自适应（1x=3
 
 /* ---------------- 主题系统（深色 0 / 浅色 1，F6 切换） ---------------- */
 u32 g_theme = 0u;           /* 0=深色（默认） 1=浅色 */
+u32 g_hc = 0u;              /* 高对比度模式（无障碍，F7 切换）：黑白黄硬对比 */
 
 /* 主题取色：按主题返回界面关键色（普通用户可直接识别两套风格） */
 static u32 dg_theme_c(u32 idx)
 {
+    if (g_hc != 0u) {   /* 无障碍高对比度：纯黑/纯白/亮黄，对比度最大化 */
+        switch (idx) {
+        case 0u: return dg_rgb(0x00,0x00,0x00);   /* 任务栏 */
+        case 1u: return dg_rgb(0xFF,0xFF,0xFF);   /* 主文本 */
+        case 2u: return dg_rgb(0xFF,0xD0,0x00);   /* 窗口标题栏 */
+        case 3u: return dg_rgb(0x00,0x00,0x00);   /* 窗口体 */
+        case 4u: return dg_rgb(0xFF,0xFF,0xFF);   /* 窗口边框 */
+        case 5u: return dg_rgb(0xFF,0xD0,0x00);   /* 开始按钮 */
+        case 6u: return dg_rgb(0x00,0x00,0x00);   /* 时钟小组件底 */
+        case 7u: return dg_rgb(0xFF,0xFF,0xFF);   /* 次级文本 */
+        case 8u: return dg_rgb(0x00,0x00,0x00);   /* 菜单/列表底色 */
+        }
+        return dg_rgb(0xFF,0xFF,0xFF);
+    }
     if (g_theme == 1u) {
         switch (idx) {
         case 0u: return dg_rgb(0xD8,0xDC,0xE2);   /* 任务栏 */
@@ -1434,12 +1449,13 @@ static void dg_render(void)
     u32 sec, hh, mm;
     char tbuf[16];
 
-    /* 1) 设计稿壁纸：XOS 1.0 桌面主界面（320x240 拉伸） */
+    /* 1) 设计稿壁纸：XOS 1.0 桌面主界面（320x240 拉伸）；高对比模式改纯黑底 */
     for (y = 0u; y < DG_H - DG_TASKBAR; y++) {
         u32 wy = (y * 120u) / (DG_H - DG_TASKBAR);
         for (x = 0u; x < DG_W; x++) {
             u32 wx = (x * 160u) / DG_W;
-            dg_fb[y * DG_W + x] = xos_wallpaper[wy * 160u + wx];
+            dg_fb[y * DG_W + x] = g_hc ? dg_rgb(0x00,0x00,0x00)
+                                       : xos_wallpaper[wy * 160u + wx];
         }
     }
 
@@ -1462,13 +1478,15 @@ static void dg_render(void)
             x = 24u + col * cw;
             y = 40u + row * rh;
             dg_icon_pattern(x, y, dg_icons[i].icon);
+            if (g_hc) dg_rect(x, y, 40u, 40u, dg_rgb(0xFF,0xFF,0xFF));  /* 高对比：图标白描边 */
             if (i == dg_sel && dg_nwin == 0u) {
                 /* 图标选中发光：外圈光晕 + 选中描边（可识别性核心，普通用户直接可见） */
-                u32 glow = (g_theme == 0u) ? dg_rgb(0x1E,0x6F,0xD0) : dg_rgb(0xE8,0xB9,0x3A);
+                u32 glow = g_hc ? dg_rgb(0xFF,0xD0,0x00)
+                                : ((g_theme == 0u) ? dg_rgb(0x1E,0x6F,0xD0) : dg_rgb(0xE8,0xB9,0x3A));
                 dg_rect(x - 4u, y - 4u, 40u, 40u, glow);
                 dg_rect(x - 2u, y - 2u, 36u, 36u, sel_c);
             }
-            dg_text(x + 2u, y + 36u, dg_icons[i].name, txt, dg_rgb(0x0E,0x22,0x40));
+            dg_text(x + 2u, y + 36u, dg_icons[i].name, txt, g_hc ? dg_rgb(0x00,0x00,0x00) : dg_rgb(0x0E,0x22,0x40));
         }
     }
 
@@ -2220,6 +2238,13 @@ void desk_gui_run(void)
         /* --- 全局主题热键：F6 切换 深色/浅色 --- */
         if (key == KEY_F6) {
             g_theme = (g_theme == 0u) ? 1u : 0u;
+            dg_render();
+            continue;
+        }
+
+        /* --- 无障碍高对比度热键：F7 切换（黑白黄硬对比，界面元素加描边） --- */
+        if (key == KEY_F7) {
+            g_hc = (g_hc == 0u) ? 1u : 0u;
             dg_render();
             continue;
         }
