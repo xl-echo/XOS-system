@@ -1459,8 +1459,12 @@ static void dg_render(void)
             x = 24u + col * cw;
             y = 40u + row * rh;
             dg_icon_pattern(x, y, dg_icons[i].icon);
-            if (i == dg_sel && dg_nwin == 0u)
-                dg_rect(x - 3u, y - 3u, 38u, 38u, sel_c);
+            if (i == dg_sel && dg_nwin == 0u) {
+                /* 图标选中发光：外圈光晕 + 选中描边（可识别性核心，普通用户直接可见） */
+                u32 glow = (g_theme == 0u) ? dg_rgb(0x1E,0x6F,0xD0) : dg_rgb(0xE8,0xB9,0x3A);
+                dg_rect(x - 4u, y - 4u, 40u, 40u, glow);
+                dg_rect(x - 2u, y - 2u, 36u, 36u, sel_c);
+            }
             dg_text(x + 2u, y + 36u, dg_icons[i].name, txt, dg_rgb(0x0E,0x22,0x40));
         }
     }
