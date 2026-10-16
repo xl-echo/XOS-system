@@ -2568,6 +2568,23 @@ void desk_gui_run(void)
                 dg_render();
                 continue;
             }
+            /* W/Tab：循环切换到下一个打开的窗口（市面 Alt+Tab 习惯，普通用户键盘切换） */
+            if (key == KEY_W || key == KEY_TAB) {
+                u32 k, found = 0u;
+                for (k = 1u; k <= DG_WIN_MAX; k++) {
+                    u32 idx = (dg_focus + k) % DG_WIN_MAX;
+                    if (dg_wins[idx].open && !dg_wins[idx].min) {
+                        dg_focus = idx;
+                        found = 1u;
+                        break;
+                    }
+                }
+                if (found) {
+                    if (dg_wins[dg_focus].maxed) { /* 焦点最大化窗口保持铺满 */ }
+                    dg_render();
+                }
+                continue;
+            }
             /* G 键窗口缩放（输入型窗口保留按键输入） */
             if (key == KEY_G && w->icon != 1u && w->icon != 2u &&
                 w->icon != 3u && w->icon != 4u) {
