@@ -1724,23 +1724,25 @@ static void dg_render(void)
         }
     }
 
-    /* 7) 鼠标光标（普通用户操作习惯：箭头指针；悬停窗口右下角时显示缩放双向箭头） */
+    /* 7) 鼠标光标（普通用户操作习惯：箭头指针；悬停窗口右下角=缩放箭头，悬停标题栏=移动十字） */
     {
-        int over_corner = 0;
+        int over_corner = 0, over_title = 0;
         u32 ci;
         for (ci = 0u; ci < DG_WIN_MAX; ci++) {
             dg_win_t *cw = &dg_wins[ci];
-            if (cw->open && !cw->min && !cw->maxed) {
+            if (cw->open && !cw->min) {
                 i32 ccx = (i32)cw->x + (i32)cw->w;
                 i32 ccy = (i32)cw->y + (i32)cw->h;
-                if ((i32)g_mx >= ccx - 8 && (i32)g_mx <= ccx + 8 &&
+                if (!cw->maxed &&
+                    (i32)g_mx >= ccx - 8 && (i32)g_mx <= ccx + 8 &&
                     (i32)g_my >= ccy - 8 && (i32)g_my <= ccy + 8) { over_corner = 1; break; }
+                if (g_mx >= (u32)cw->x && g_mx <= (u32)(cw->x + (i32)cw->w) &&
+                    g_my >= (u32)cw->y && g_my <= (u32)(cw->y + 22)) { over_title = 1; }
             }
         }
         if (g_mx + 9u < DG_W && g_my + 9u < DG_H) {
             u32 cx = g_mx, cy = g_my;
             if (over_corner) {
-                /* 缩放光标：右下↔左上双向箭头（黑边白心） */
                 u32 c;
                 for (c = 0u; c < 9u; c++) {
                     dg_fill(cx + c, cy + c, 1u, 1u, dg_rgb(0xFF,0xFF,0xFF));
@@ -1750,6 +1752,12 @@ static void dg_render(void)
                 dg_fill(cx + 8u, cy + 8u, 1u, 1u, dg_rgb(0x00,0x00,0x00));
                 dg_fill(cx + 7u, cy, 1u, 1u, dg_rgb(0x00,0x00,0x00));
                 dg_fill(cx, cy + 8u, 1u, 1u, dg_rgb(0x00,0x00,0x00));
+            } else if (over_title) {
+                /* 移动十字箭头 */
+                dg_fill(cx + 3u, cy, 3u, 9u, dg_rgb(0xFF,0xFF,0xFF));
+                dg_fill(cx, cy + 3u, 9u, 3u, dg_rgb(0xFF,0xFF,0xFF));
+                dg_fill(cx + 4u, cy, 1u, 9u, dg_rgb(0x00,0x00,0x00));
+                dg_fill(cx, cy + 4u, 9u, 1u, dg_rgb(0x00,0x00,0x00));
             } else {
                 dg_fill(cx, cy, 3u, 1u, dg_rgb(0xFF,0xFF,0xFF));
                 dg_fill(cx, cy, 1u, 4u, dg_rgb(0xFF,0xFF,0xFF));
