@@ -2521,6 +2521,21 @@ void desk_gui_run(void)
                 sysconf_set_u32("screen.mode", mi);   /* 分辨率记忆恢复 */
                 dg_font_scale_auto();                 /* 字体随分辨率重算档位 */
                 mse_set_screen(DG_W, DG_H);           /* 鼠标边界随分辨率自适应 */
+                /* 分辨率自适应：把所有打开窗口夹回新屏幕内，防止小分辨率下窗口飞出 */
+                {
+                    u32 wi;
+                    for (wi = 0u; wi < DG_WIN_MAX; wi++) {
+                        dg_win_t *ww = &dg_wins[wi];
+                        if (!ww->open || ww->min) continue;
+                        if (ww->w > DG_W) ww->w = DG_W;
+                        if (ww->h > (DG_H - DG_TASKBAR)) ww->h = DG_H - DG_TASKBAR;
+                        if ((i32)ww->x + (i32)ww->w > (i32)DG_W)
+                            ww->x = (u32)((i32)DG_W - (i32)ww->w);
+                        if ((i32)ww->y + (i32)ww->h > (i32)(DG_H - DG_TASKBAR))
+                            ww->y = (u32)((i32)(DG_H - DG_TASKBAR) - (i32)ww->h);
+                        if (ww->maxed) { ww->x = 0; ww->y = 0; ww->w = DG_W; ww->h = DG_H - DG_TASKBAR; }
+                    }
+                }
                 dg_render();
             }
             continue;
