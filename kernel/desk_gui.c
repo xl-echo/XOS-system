@@ -1636,6 +1636,9 @@ static void dg_render(void)
                     dg_rgb(0xF0,0xF0,0xF0), bar);
         }
     }
+    /* 任务栏最右"显示桌面"窄条（市面标准可视把手） */
+    dg_fill(DG_W - 6u, DG_H - DG_TASKBAR, 4u, DG_TASKBAR,
+            g_theme == 1u ? dg_rgb(0xC8,0xD0,0xDC) : dg_rgb(0x48,0x58,0x70));
 
     /* 5) 开始菜单浮层 */
     if (dg_menu == DG_MENU_START) {
@@ -2367,8 +2370,19 @@ void desk_gui_run(void)
                     if ((mev.x - g_mdown_x) * (mev.x - g_mdown_x) +
                         (mev.y - g_mdown_y) * (mev.y - g_mdown_y) < 36u) {
                     u32 hx = mev.x, hy = mev.y;
+                    /* 任务栏最右"显示桌面"窄条（市面标准：点它全部最小化/恢复） */
+                    if (hy >= DG_H - g_tb_h && hx >= DG_W - 10u) {
+                        u32 bi, any_vis = 0;
+                        for (bi = 0u; bi < DG_WIN_MAX; bi++) {
+                            if (dg_wins[bi].open && !dg_wins[bi].min) { any_vis = 1u; break; }
+                        }
+                        for (bi = 0u; bi < DG_WIN_MAX; bi++) {
+                            if (dg_wins[bi].open) dg_wins[bi].min = any_vis ? 1u : 0u;
+                        }
+                        dg_render();
+                    }
                     /* 任务栏开始按钮（左下角 56x28） */
-                    if (hy >= DG_H - g_tb_h && hx < 56u) {
+                    else if (hy >= DG_H - g_tb_h && hx < 56u) {
                         dg_menu = (dg_menu == DG_MENU_START) ? DG_MENU_NONE : DG_MENU_START;
                         dg_menusel = 0u;
                         dg_render();
