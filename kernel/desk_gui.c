@@ -474,6 +474,9 @@ typedef struct {
     u32  min;                  /* 最小化（缩到任务栏） */
     u32  anim;                 /* 打开动画中（滑入） */
     u32  anim_from;            /* 滑入目标 y */
+    u32  maxed;                /* 最大化（铺满客户区） */
+    i32  rx, ry, rw, rh;       /* 还原前几何（最大化前） */
+    u32  last_dn;              /* 标题栏上次按下 tick（双击检测） */
     char inbuf[24];            /* 输入缓冲（计算器/终端） */
     u32  inlen;
     char out[4][40];           /* 输出缓冲（终端/计算器结果） */
@@ -1425,8 +1428,8 @@ static void dg_window_draw(const dg_win_t *w)
     /* 左侧应用色条（直观识别应用类别） */
     dg_fill(w->x + 5u, w->y + 6u, 5u, 14u, dg_win_accent(w->icon));
     dg_text(w->x + 16u, w->y + 9u, name, dg_theme_c(1u), title);
-    /* 右侧尺寸档位 */
-    dg_text(w->x + w->w - 40u, w->y + 9u,
+    /* 右侧尺寸档位（移到按钮组左侧，避免与窗口按钮重叠） */
+    dg_text(w->x + w->w - 96u, w->y + 9u,
             dg_wsz == 0u ? "1x" : (dg_wsz == 1u ? "2x" : "3x"),
             dg_rgb(0xE8,0xC8,0x4A), title);
     /* 3D 边框：上/左亮线 + 右/下暗线 + 外描边（立体可识别） */
@@ -1438,9 +1441,17 @@ static void dg_window_draw(const dg_win_t *w)
     /* 关闭按钮 X */
     dg_fill(w->x + w->w - 24u, w->y + 5u, 18u, 16u, dg_rgb(0xC0,0x30,0x30));
     dg_char(w->x + w->w - 20u, w->y + 9u, 'X', dg_rgb(0xFF,0xFF,0xFF), dg_rgb(0xC0,0x30,0x30), g_font_scale);
+    /* 最大化按钮 □（未最大化=方框，已最大化=还原双框） */
+    dg_fill(w->x + w->w - 48u, w->y + 5u, 18u, 16u, dg_rgb(0x3A,0x6A,0x4A));
+    if (!w->maxed) {
+        dg_rect(w->x + w->w - 43u, w->y + 9u, 9u, 8u, dg_rgb(0xF0,0xF0,0xF0));
+    } else {
+        dg_fill(w->x + w->w - 44u, w->y + 8u, 9u, 7u, dg_rgb(0xF0,0xF0,0xF0));
+        dg_fill(w->x + w->w - 42u, w->y + 11u, 7u, 5u, dg_rgb(0x3A,0x6A,0x4A));
+    }
     /* 最小化按钮 _ */
-    dg_fill(w->x + w->w - 48u, w->y + 5u, 18u, 16u, dg_rgb(0x3A,0x5A,0x8A));
-    dg_fill(w->x + w->w - 43u, w->y + 16u, 8u, 2u, dg_rgb(0xF0,0xF0,0xF0));
+    dg_fill(w->x + w->w - 72u, w->y + 5u, 18u, 16u, dg_rgb(0x3A,0x5A,0x8A));
+    dg_fill(w->x + w->w - 67u, w->y + 16u, 8u, 2u, dg_rgb(0xF0,0xF0,0xF0));
     /* 移动模式边框提示 */
     if (dg_move_mode && w == &dg_wins[dg_focus])
         dg_rect(w->x - 2u, w->y - 2u, w->w + 4u, w->h + 4u, dg_rgb(0x30,0xC0,0x50));
@@ -2183,6 +2194,28 @@ static void dg_win_close(void)
     dg_focus = 0u;
 }
 
+/* 最大化/还原切换：铺满客户区 vs 还原几何（市面标准习惯） */
+static void dg_win_toggle_max(u32 bi)
+{
+    dg_win_t *w = &dg_wins[bi];
+    if (!w->open || w->min) return;
+    if (!w->maxed) {
+        /* 进入最大化：保存当前几何，铺满客户区（留任务栏） */
+        w->rx = (i32)w->x; w->ry = (i32)w->y;
+        w->rw = (i32)w->w; w->rh = (i32)w->h;
+        w->x = 0u;
+        w->y = 0u;
+        w->w = DG_W;
+        w->h = DG_H - DG_TASKBAR;
+        w->maxed = 1u;
+    } else {
+        /* 还原：回到最大化前几何 */
+        w->x = (u32)w->rx; w->y = (u32)w->ry;
+        w->w = (u32)w->rw; w->h = (u32)w->rh;
+        w->maxed = 0u;
+    }
+}
+
 void desk_gui_run(void)
 {
     kbd_event_t ev, tmp;
@@ -2297,11 +2330,28 @@ void desk_gui_run(void)
                                     dg_render();
                                     break;
                                 }
+                                /* 最大化按钮（绿色方框，居中） */
                                 if (hx >= (u32)(w->x + (i32)w->w - 48) &&
                                     hx <= (u32)(w->x + (i32)w->w - 30)) {
+                                    dg_win_toggle_max(bi);
+                                    dg_render();
+                                    break;
+                                }
+                                /* 最小化按钮（蓝色下划线，最左） */
+                                if (hx >= (u32)(w->x + (i32)w->w - 72) &&
+                                    hx <= (u32)(w->x + (i32)w->w - 54)) {
                                     w->min = 1u;
                                     dg_render();
                                     break;
+                                }
+                                /* 双击标题栏空白区 → 最大化/还原 */
+                                {
+                                    u32 now = pit_tick_count();
+                                    if (now - w->last_dn < 25u) {
+                                        dg_win_toggle_max(bi);
+                                        dg_render();
+                                    }
+                                    w->last_dn = now;
                                 }
                             }
                         }
