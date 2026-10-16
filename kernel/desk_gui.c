@@ -662,8 +662,8 @@ static void dg_win_content(const dg_win_t *w)
                 dg_text(bx + 4u, by + 94u, "Display: 640x480x32 VBE fb", dg_rgb(0xE0,0xE0,0xE0), body);
             } else if (pg[0] == 'h' && pg[1] == 'e' && pg[2] == 'l' && pg[3] == 'p') {
                 dg_text(bx + 4u, by + 28u, "Desktop Keys", fg, body);
-                dg_text(bx + 4u, by + 50u, "M move  N minimize  1-4 restore", dg_rgb(0xE0,0xE0,0xE0), body);
-                dg_text(bx + 4u, by + 72u, "W/Tab switch  S Start  R menu", dg_rgb(0xE0,0xE0,0xE0), body);
+                dg_text(bx + 4u, by + 50u, "M move  N minimize  W switch  1-4 restore", dg_rgb(0xE0,0xE0,0xE0), body);
+                dg_text(bx + 4u, by + 72u, "W switch  S Start  R menu", dg_rgb(0xE0,0xE0,0xE0), body);
                 dg_text(bx + 4u, by + 94u, "Esc close / exit desktop", dg_rgb(0xE0,0xE0,0xE0), body);
             } else {
                 dg_text(bx + 4u, by + 28u, "XOS Web", fg, body);
@@ -1108,7 +1108,7 @@ static void dg_win_content(const dg_win_t *w)
                 dg_text(bx + 12u, by + 132u, "Power: S menu -> shutdown", dg_rgb(0x18,0x18,0x18), dg_rgb(0xF8,0xF0,0xDC));
             } else if (dg_help_page == 1u) {
                 dg_text(bx + 12u, by + 68u, "Window: M move  N minimize", dg_rgb(0x18,0x18,0x18), dg_rgb(0xF8,0xF0,0xDC));
-                dg_text(bx + 12u, by + 84u, "W/Tab switch  1-4 restore", dg_rgb(0x18,0x18,0x18), dg_rgb(0xF8,0xF0,0xDC));
+                dg_text(bx + 12u, by + 84u, "W/Tab switch  W switch  1-4 restore", dg_rgb(0x18,0x18,0x18), dg_rgb(0xF8,0xF0,0xDC));
                 dg_text(bx + 12u, by + 100u, "Esc close window", dg_rgb(0x18,0x18,0x18), dg_rgb(0xF8,0xF0,0xDC));
                 dg_text(bx + 12u, by + 116u, "Mouse left double-click to launch", dg_rgb(0x18,0x18,0x18), dg_rgb(0xF8,0xF0,0xDC));
             } else if (dg_help_page == 2u) {
@@ -2613,8 +2613,8 @@ void desk_gui_run(void)
                 dg_render();
                 continue;
             }
-            /* W/Tab：循环切换到下一个打开的窗口（市面 Alt+Tab 习惯，普通用户键盘切换） */
-            if (key == KEY_W || key == KEY_TAB) {
+            /* W：循环切换到下一个打开的窗口（Tab 保留给应用内导航） */
+            if (key == KEY_W) {
                 u32 k, found = 0u;
                 for (k = 1u; k <= DG_WIN_MAX; k++) {
                     u32 idx = (dg_focus + k) % DG_WIN_MAX;
