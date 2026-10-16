@@ -2275,6 +2275,23 @@ void desk_gui_run(void)
                                 break;
                             }
                         }
+                        /* 客户区点击 → 前置该窗口（Z序提升，市面标准：点谁谁到最前） */
+                        if (g_drag_win < 0) {
+                            u32 k, top = DG_WIN_MAX;
+                            for (k = 0u; k < DG_WIN_MAX; k++) {
+                                u32 idx = (dg_focus + 1u + k) % DG_WIN_MAX;
+                                dg_win_t *w = &dg_wins[idx];
+                                if (w->open && !w->min &&
+                                    mev.x >= (u32)w->x && mev.x <= (u32)(w->x + (i32)w->w) &&
+                                    mev.y >= (u32)(w->y + 22) && mev.y <= (u32)(w->y + (i32)w->h)) {
+                                    top = idx;   /* 后画=更上层，覆盖前面记录 */
+                                }
+                            }
+                            if (top < DG_WIN_MAX && (int)top != (int)dg_focus) {
+                                dg_focus = top;
+                                dg_render();
+                            }
+                        }
                     }
                 }
             } else if (mev.type == MOUSE_EV_BTN_UP) {
