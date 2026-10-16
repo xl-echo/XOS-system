@@ -2429,6 +2429,21 @@ void desk_gui_run(void)
                 }
                 dg_render();
             }
+            /* 鼠标滚轮：有窗口时循环切换焦点（市面习惯：滚轮切窗口/滚动） */
+            else if (mev.type == MOUSE_EV_WHEEL && dg_nwin > 0u &&
+                     dg_menu == DG_MENU_NONE && !dg_move_mode) {
+                i32 dir = mev.wheel;   /* +1 上滚 / -1 下滚 */
+                u32 step = (dir >= 0) ? 1u : (u32)(DG_WIN_MAX - 1u);
+                u32 k;
+                for (k = 1u; k <= DG_WIN_MAX; k++) {
+                    u32 idx = (dg_focus + step * k) % DG_WIN_MAX;
+                    if (dg_wins[idx].open && !dg_wins[idx].min) {
+                        dg_focus = idx;
+                        dg_render();
+                        break;
+                    }
+                }
+            }
         }
         }
         /* 窗口打开动画：滑入期间每 5 tick 重绘（动效与过渡） */
