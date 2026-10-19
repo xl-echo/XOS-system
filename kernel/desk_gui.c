@@ -1563,6 +1563,11 @@ static void dg_render(void)
                 dg_rect(x - 4u, y - 4u, 40u, 40u, glow);
                 dg_rect(x - 2u, y - 2u, 36u, 36u, sel_c);
             }
+            /* 鼠标悬停高亮（普通用户可识别"可点"；白色外框，不覆盖选中发光） */
+            if (dg_nwin == 0u && i != dg_sel &&
+                g_mx >= x && g_mx <= x + 40u && g_my >= y && g_my <= y + 40u) {
+                dg_rect(x - 3u, y - 3u, 42u, 42u, dg_rgb(0xFF,0xFF,0xFF));
+            }
             if (g_hc) dg_text_ol(x + 2u, y + 36u, dg_icons[i].name,
                                  dg_rgb(0xFF,0xFF,0xFF), dg_rgb(0x00,0x00,0x00),
                                  dg_rgb(0x00,0x00,0x00));
@@ -2366,6 +2371,29 @@ void desk_gui_run(void)
                     dg_render();
                 } else if (g_mbtn != 0u) {
                     dg_render();   /* 按住移动：更新光标（拖动预览） */
+                }
+                /* 菜单 hover：开始菜单/右键菜单打开时，鼠标悬停行即更新选中（市面习惯） */
+                if (dg_menu == DG_MENU_START) {
+                    u32 mx2 = 6u, my2 = DG_H - DG_TASKBAR - 24u * 14u - 18u;
+                    if (my2 < 8u) my2 = 8u;
+                    if (mev.y >= my2 + 18u && mev.y < my2 + 18u + 24u * 14u &&
+                        mev.x >= mx2 && mev.x <= mx2 + 210u) {
+                        u32 item = (mev.y - (my2 + 18u)) / 14u;
+                        if (item < DG_ICON_N && dg_menusel != item) {
+                            dg_menusel = item; dg_render();
+                        }
+                    }
+                } else if (dg_menu == DG_MENU_RIGHT) {
+                    u32 cols2 = DG_W / 100u;
+                    u32 rx2 = 24u + (dg_sel % cols2) * 100u + 30u;
+                    u32 ry2 = 40u + (dg_sel / cols2) * 94u + 10u;
+                    if (mev.y >= ry2 + 6u && mev.y < ry2 + 6u + 3u * 20u &&
+                        mev.x >= rx2 && mev.x <= rx2 + 150u) {
+                        u32 item = (mev.y - (ry2 + 6u)) / 20u;
+                        if (item < 3u && dg_menusel != item) {
+                            dg_menusel = item; dg_render();
+                        }
+                    }
                 }
             } else if (mev.type == MOUSE_EV_BTN_DOWN) {
                 g_mbtn |= mev.button;
