@@ -669,6 +669,11 @@ static void dg_win_content(const dg_win_t *w)
         dg_text(bx, by, "note.txt - Text Editor", fg, body);
         dg_text(bx + 4u, by + dy, w->inlen ? w->inbuf : "(type text, Enter save)",
                 dg_rgb(0xF0,0xF0,0xF0), body);
+        /* 输入光标：位于文本末尾，半秒闪烁（普通用户可识别当前输入位置） */
+        if (((pit_tick_count() / 30u) & 1u) == 0u) {
+            u32 cx2 = bx + 4u + dg_text_w(w->inlen ? w->inbuf : "(type text, Enter save)");
+            dg_fill(cx2, by + dy, 2u * g_font_scale, 8u * g_font_scale, dg_rgb(0xFF,0xFF,0xFF));
+        }
         dg_text(bx + 4u, by + dy2, w->out[0], gray, body);
         dg_text(bx + 4u, by + dy3, w->out[2], blue, body);
         dg_text(bx + 4u, by + dy4, w->out[1], fg, body);
@@ -1519,6 +1524,15 @@ static void dg_window_draw(const dg_win_t *w)
     /* 最小化按钮 _ */
     dg_fill(w->x + w->w - 72u, w->y + 5u, 18u, 16u, dg_rgb(0x3A,0x5A,0x8A));
     dg_fill(w->x + w->w - 67u, w->y + 16u, 8u, 2u, dg_rgb(0xF0,0xF0,0xF0));
+    /* 窗口按钮 hover 反馈：悬停即白框高亮（普通用户可识别可点） */
+    if (g_my >= (u32)(w->y + 5u) && g_my <= (u32)(w->y + 21u)) {
+        if (g_mx >= (u32)w->x + (i32)w->w - 24u && g_mx <= (u32)w->x + (i32)w->w - 6u)
+            dg_rect(w->x + w->w - 24u, w->y + 5u, 18u, 16u, dg_rgb(0xFF,0xFF,0xFF));
+        if (g_mx >= (u32)w->x + (i32)w->w - 48u && g_mx <= (u32)w->x + (i32)w->w - 30u)
+            dg_rect(w->x + w->w - 48u, w->y + 5u, 18u, 16u, dg_rgb(0xFF,0xFF,0xFF));
+        if (g_mx >= (u32)w->x + (i32)w->w - 72u && g_mx <= (u32)w->x + (i32)w->w - 54u)
+            dg_rect(w->x + w->w - 72u, w->y + 5u, 18u, 16u, dg_rgb(0xFF,0xFF,0xFF));
+    }
     /* 移动模式边框提示 */
     if (dg_move_mode && w == &dg_wins[dg_focus])
         dg_rect(w->x - 2u, w->y - 2u, w->w + 4u, w->h + 4u, dg_rgb(0x30,0xC0,0x50));
