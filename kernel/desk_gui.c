@@ -2642,6 +2642,12 @@ void desk_gui_run(void)
             dg_anim_step();
             dg_render();
         }
+        /* 任务管理器自动刷新：窗口打开且为焦点时每 2 秒(200 tick)重绘真实数据 */
+        if (dg_nwin > 0u && dg_wins[dg_focus].open && dg_wins[dg_focus].icon == 12u &&
+            pit_tick_count() - dg_last_repaint >= 200u) {
+            dg_last_repaint = pit_tick_count();
+            dg_render();
+        }
         if (kbd_read_event(&ev) != 0) {
             /* 闹钟心跳：无键时由 PIT 定时中断唤醒检查到点 */
             if (dg_alm_set == 2u && !dg_alm_ring &&
