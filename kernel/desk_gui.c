@@ -95,6 +95,14 @@ static u32 dg_tb_txt_y(void)  /* 任务栏文字垂直居中偏移 */
     return (g_tb_h - 8u * g_font_scale) / 2u;
 }
 
+/* 任务栏窗口按钮区起点：随分辨率自适应，避免小分辨率与右侧系统区重叠（布局自适应） */
+static u32 dg_wbtn_x0(void)
+{
+    if (DG_W < 800u) return 120u;
+    if (DG_W < 1000u) return 200u;
+    return 300u;
+}
+
 /* 字体缩放自动档位：随分辨率自适应（1280+ 放大 2x，1920+ 放大 3x） */
 void dg_font_scale_auto(void)
 {
@@ -1623,7 +1631,7 @@ static void dg_render(void)
     dg_text(78u, DG_H - DG_TASKBAR + dg_tb_txt_y(), "v1.0", dg_theme_c(7u), bar);
     /* 最小化窗口的恢复按钮（点击概念：按对应数字键恢复） */
     if (dg_nwin > 0u) {
-        u32 rbx = 300u;
+        u32 rbx = dg_wbtn_x0();
         for (i = 0u; i < DG_WIN_MAX; i++) {
             if (dg_wins[i].open) {
                 u32 col = dg_wins[i].min ? dg_theme_c(7u)
@@ -2478,8 +2486,8 @@ void desk_gui_run(void)
                         dg_render();
                     }
                     /* 任务栏窗口按钮（市面习惯：点击任务栏应用图标切换/最小化恢复） */
-                    else if (hy >= DG_H - g_tb_h && hx >= 300u) {
-                        u32 rbx = 300u, bi;
+                    else if (hy >= DG_H - g_tb_h && hx >= dg_wbtn_x0()) {
+                        u32 rbx = dg_wbtn_x0(), bi;
                         for (bi = 0u; bi < DG_WIN_MAX; bi++) {
                             if (dg_wins[bi].open) {
                                 if (hx >= rbx && hx <= rbx + 40u) {
