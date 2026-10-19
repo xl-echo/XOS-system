@@ -1698,6 +1698,9 @@ static void dg_render(void)
         tbuf[6] = 0;
         dg_text(bx + 38u, DG_H - DG_TASKBAR + dg_tb_txt_y(), tbuf, dg_theme_c(1u), bar);
     }
+    /* 闹钟提醒角标：响铃时红点闪烁（普通用户可识别"有提醒"） */
+    if (dg_alm_ring && ((pit_tick_count() / 20u) & 1u) == 0u)
+        dg_fill(DG_W - 172u, DG_H - DG_TASKBAR + (g_tb_h - 10u) / 2u, 10u, 10u, dg_rgb(0xE0,0x30,0x30));
     /* 系统托盘：网络 + 音量 + 电池 + 通知角标 */
     dg_fill(DG_W - 150u, DG_H - DG_TASKBAR + (g_tb_h - 10u) / 2u, 10u, 10u, dg_rgb(0x30,0xC0,0x50));   /* 网络绿点 */
     dg_fill(DG_W - 128u, DG_H - DG_TASKBAR + (g_tb_h - 12u) / 2u, 12u, 12u, dg_rgb(0xE0,0xB0,0x40));   /* 音量 */
