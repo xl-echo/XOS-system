@@ -695,14 +695,24 @@ static void dg_win_content(const dg_win_t *w)
             dg_text(bx + 10u, by + 6u, w->inlen ? w->inbuf : "0",
                     dg_rgb(0xF0,0xF0,0xF0), dg_rgb(0x2A,0x3A,0x4A));
             dg_text(bx + 10u, by + 34u, w->out[0], dg_rgb(0x1E,0x6F,0xD0), body);
-            for (j = 0u; j < 3u; j++) {
-                dg_fill(bx + 4u + j * 52u, by + 58u, 46u, 22u, dg_rgb(0xC8,0xCC,0xD0));
-                dg_rect(bx + 4u + j * 52u, by + 58u, 46u, 22u, dg_rgb(0x88,0x8C,0x90));
+            /* 完整数字键盘 4x3：1-9、0、=、C（普通用户可直接点击） */
+            {
+                static const char *cpk[12] = { "1","2","3","4","5","6","7","8","9","0","=","C" };
+                u32 ky, kx;
+                for (ky = 0u; ky < 4u; ky++) {
+                    for (kx = 0u; kx < 3u; kx++) {
+                        u32 ki = ky * 3u + kx;
+                        u32 bxk = bx + 4u + kx * 52u;
+                        u32 byk = by + 58u + ky * 24u;
+                        u32 op = (ki == 10u || ki == 11u);
+                        dg_fill(bxk, byk, 46u, 22u, op ? dg_rgb(0x3A,0x6A,0x4A) : dg_rgb(0xC8,0xCC,0xD0));
+                        dg_rect(bxk, byk, 46u, 22u, dg_rgb(0x88,0x8C,0x90));
+                        dg_text(bxk + 16u, byk + 5u, cpk[ki], fg,
+                                op ? dg_rgb(0x3A,0x6A,0x4A) : dg_rgb(0xC8,0xCC,0xD0));
+                    }
+                }
             }
-            dg_text(bx + 12u, by + 63u, "1", fg, dg_rgb(0xC8,0xCC,0xD0));
-            dg_text(bx + 64u, by + 63u, "2", fg, dg_rgb(0xC8,0xCC,0xD0));
-            dg_text(bx + 116u, by + 63u, "3", fg, dg_rgb(0xC8,0xCC,0xD0));
-            dg_text(bx, by + dy5, "digits+ops  Enter=  Backspace=del  Esc=close", gray, body);
+            dg_text(bx, by + dy5, "click keys  Enter=  Backspace=del  Esc=close", gray, body);
             break;
         }
     case 3u: /* 图形终端：真实命令执行 */
@@ -2579,6 +2589,26 @@ void desk_gui_run(void)
                                     w->last_dn = now;
                                 }
                             }
+                        }
+                    }
+                    /* 计算器键位点击（布局同绘制：键网格 bx+4,by+58 起 4x3） */
+                    else if (dg_nwin > 0u && !dg_wins[dg_focus].min &&
+                             dg_wins[dg_focus].icon == 2u) {
+                        dg_win_t *cw = &dg_wins[dg_focus];
+                        u32 kbx = (u32)cw->x + 16u;
+                        u32 kby = (u32)cw->y + 26u + 58u;
+                        if (hx >= kbx && hx <= kbx + 3u * 52u &&
+                            hy >= kby && hy <= kby + 4u * 24u) {
+                            u32 kcol = (hx - kbx) / 52u;
+                            u32 krow = (hy - kby) / 24u;
+                            u32 ki = krow * 3u + kcol;
+                            u32 kcode;
+                            if (ki < 9u) kcode = KEY_1 + ki;        /* 1-9 */
+                            else if (ki == 9u) kcode = KEY_0;        /* 0 */
+                            else if (ki == 10u) kcode = KEY_ENTER;   /* = */
+                            else kcode = KEY_BACKSP;                 /* C 清空 */
+                            dg_calc_input(cw, kcode);
+                            dg_render();
                         }
                     }
                     /* 开始菜单项点击（与绘制布局一致：mx=6, 项 y=my+18+i*14） */
