@@ -640,8 +640,13 @@ static void dg_win_content(const dg_win_t *w)
                     if (fs_readdir(path, di, nm) != 0) break;
                     if (nm[0] == 0) break;
                     n++;
+                    /* 选中行整行反色高亮（市面标准：蓝底白字，普通用户一眼看清当前行） */
+                    if (ln == dg_fm_sel)
+                        dg_fill(bx + 2u, by + dy + ln * 22u, (w->w > 60u) ? w->w - 60u : 200u, 18u,
+                                dg_rgb(0x2F,0x7D,0xE1));
                     dg_text(bx + 4u, by + dy + ln * dy,
-                            ln == dg_fm_sel ? " >" : "  ", dg_rgb(0xE8,0xA0,0x30), body);
+                            ln == dg_fm_sel ? " >" : "  ",
+                            ln == dg_fm_sel ? dg_rgb(0xFF,0xFF,0xFF) : dg_rgb(0xE8,0xA0,0x30), body);
                     /* 尝试按文件打开：成功=文件，失败=目录 */
                     {
                         char fp[64];
@@ -650,12 +655,15 @@ static void dg_win_content(const dg_win_t *w)
                         while (base[j]) { fp[j] = base[j]; j++; }
                         { u32 k = 0u; while (nm[k] && j + k < 60u) { fp[j + k] = nm[k]; k++; } fp[j + k] = 0; }
                         if (fs_open(fp, O_READ) >= 0) {
-                            dg_text(bx + 12u, by + dy + ln * 22u, "[F]", dg_rgb(0x2A,0x8A,0x3A), body);
+                            dg_text(bx + 12u, by + dy + ln * 22u, "[F]",
+                                    ln == dg_fm_sel ? dg_rgb(0xFF,0xFF,0xFF) : dg_rgb(0x2A,0x8A,0x3A), body);
                         } else {
-                            dg_text(bx + 12u, by + dy + ln * 22u, "[D]", dg_rgb(0x1E,0x6F,0xD0), body);
+                            dg_text(bx + 12u, by + dy + ln * 22u, "[D]",
+                                    ln == dg_fm_sel ? dg_rgb(0xFF,0xFF,0xFF) : dg_rgb(0x1E,0x6F,0xD0), body);
                         }
                     }
-                    dg_text(bx + 30u, by + dy + ln * 22u, nm, fg, body);
+                    dg_text(bx + 30u, by + dy + ln * 22u, nm,
+                            ln == dg_fm_sel ? dg_rgb(0xFF,0xFF,0xFF) : fg, body);
                     ln++;
                     di++;
                     if (ln >= 5u) break;
