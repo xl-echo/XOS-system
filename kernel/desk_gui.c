@@ -255,6 +255,64 @@ static void dg_char(u32 x, u32 y, u8 ch, u32 fg, u32 bg, u32 scale)
         }
 }
 
+/* 描边文本：先画 8 邻域描边色，再画本体——任意浅色/图片背景上白字黑边，普通用户直接可读 */
+static void dg_char_ol(u32 x, u32 y, u8 ch, u32 fg, u32 ol, u32 bg, u32 scale)
+{
+    u32 i, j;
+    const u8 *g;
+    u32 idx;
+    if (ch < 0x20u) return;
+    idx = ch - 0x20u;
+    if (idx >= 96u) idx = 95u;
+    g = dg_font8[idx];
+    /* 描边层：8 邻域各铺一遍描边色 */
+    {
+        i32 dx, dy;
+        for (dy = -1; dy <= 1; dy++)
+            for (dx = -1; dx <= 1; dx++) {
+                if (dx == 0 && dy == 0) continue;
+                for (j = 0u; j < 8u; j++)
+                    for (i = 0u; i < 8u; i++) {
+                        u32 on = (g[j] >> (7u - i)) & 1u;
+                        if (!on) continue;
+                        if (scale <= 1u) {
+                            dgpix((u32)((i32)x + (i32)i + dx),
+                                  (u32)((i32)y + (i32)j + dy), ol);
+                        } else {
+                            u32 px, py;
+                            for (px = 0u; px < scale; px++)
+                                for (py = 0u; py < scale; py++)
+                                    dgpix((u32)((i32)x + (i32)(i*scale) + (i32)px + dx*(i32)scale),
+                                          (u32)((i32)y + (i32)(j*scale) + (i32)py + dy*(i32)scale), ol);
+                        }
+                    }
+            }
+    }
+    /* 本体层 */
+    for (j = 0u; j < 8u; j++)
+        for (i = 0u; i < 8u; i++) {
+            u32 on = (g[j] >> (7u - i)) & 1u;
+            if (scale <= 1u) {
+                dgpix(x + i, y + j, on ? fg : bg);
+            } else {
+                u32 px, py;
+                for (px = 0u; px < scale; px++)
+                    for (py = 0u; py < scale; py++)
+                        dgpix(x + i * scale + px, y + j * scale + py, on ? fg : bg);
+            }
+        }
+}
+
+void dg_text_ol(u32 x, u32 y, const char *s, u32 fg, u32 ol, u32 bg)
+{
+    if (!s) return;
+    while (*s) {
+        dg_char_ol(x, y, (u8)*s, fg, ol, bg, g_font_scale);
+        x += 8u * g_font_scale;
+        s++;
+    }
+}
+
 void dg_text(u32 x, u32 y, const char *s, u32 fg, u32 bg)
 {
     if (!s) return;
@@ -1464,7 +1522,6 @@ static void dg_render(void)
 {
     u32 i, x, y, k;
     u32 bar = dg_theme_c(0u);
-    u32 txt = dg_theme_c(1u);
     u32 sel_c = dg_rgb(0xFF,0xFF,0xFF);
     u32 sec, hh, mm;
     char tbuf[16];
@@ -1506,7 +1563,12 @@ static void dg_render(void)
                 dg_rect(x - 4u, y - 4u, 40u, 40u, glow);
                 dg_rect(x - 2u, y - 2u, 36u, 36u, sel_c);
             }
-            dg_text(x + 2u, y + 36u, dg_icons[i].name, txt, g_hc ? dg_rgb(0x00,0x00,0x00) : dg_rgb(0x0E,0x22,0x40));
+            if (g_hc) dg_text_ol(x + 2u, y + 36u, dg_icons[i].name,
+                                 dg_rgb(0xFF,0xFF,0xFF), dg_rgb(0x00,0x00,0x00),
+                                 dg_rgb(0x00,0x00,0x00));
+            else dg_text_ol(x + 2u, y + 36u, dg_icons[i].name,
+                            dg_rgb(0xFF,0xFF,0xFF), dg_rgb(0x00,0x00,0x00),
+                            dg_rgb(0x0E,0x22,0x40));
         }
     }
 
