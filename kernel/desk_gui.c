@@ -1583,6 +1583,22 @@ static void dg_render(void)
         }
     }
 
+    /* 2) 欢迎向导（绘制于壁纸之上、图标之下：最底层不挡交互） */
+    if (dg_welcome) {
+        u32 wx = 60u, wy = 70u, ww = DG_W - 120u, wh = 190u;
+        u32 mbg = dg_theme_c(8u);
+        dg_fill(wx, wy, ww, wh, mbg);
+        dg_rect(wx, wy, ww, wh, dg_rgb(0x58,0x88,0xC0));
+        dg_fill(wx, wy, ww, 26u, dg_rgb(0x1E,0x6F,0xD0));
+        dg_text(wx + 10u, wy + 9u, "Welcome to XOS", dg_rgb(0xFF,0xFF,0xFF), dg_rgb(0x1E,0x6F,0xD0));
+        dg_text(wx + 16u, wy + 44u, "Tab select icon, Enter open app", dg_theme_c(1u), mbg);
+        dg_text(wx + 16u, wy + 68u, "S Start menu   R Right menu", dg_theme_c(1u), mbg);
+        dg_text(wx + 16u, wy + 92u, "M move   N minimize   Esc close", dg_theme_c(1u), mbg);
+        dg_text(wx + 16u, wy + 116u, "Start menu: 24 apps", dg_theme_c(1u), mbg);
+        dg_text(wx + 16u, wy + 140u, "Note editor saves to /note.txt", dg_theme_c(1u), mbg);
+        dg_text(wx + ww / 2u - 88u, wy + wh - 24u, "Press Enter to start", dg_rgb(0x30,0xC0,0x50), mbg);
+    }
+
     /* 2) 图标：按分辨率+字体缩放自适应网格（列宽=图标96+文字宽度、行距随字高缩放） */
     {
         u32 cw = 96u, rh = 94u, cols;
@@ -1775,22 +1791,6 @@ static void dg_render(void)
         }
         dg_text(mx + 8u, my + mh - 14u, "Up/Dn select  Enter start  Esc close",
                 dg_theme_c(7u), mbg);
-    }
-
-    /* 5.5) 首次使用欢迎弹窗 */
-    if (dg_welcome) {
-        u32 wx = 60u, wy = 70u, ww = DG_W - 120u, wh = 190u;
-        u32 mbg = dg_theme_c(8u);
-        dg_fill(wx, wy, ww, wh, mbg);
-        dg_rect(wx, wy, ww, wh, dg_rgb(0x58,0x88,0xC0));
-        dg_fill(wx, wy, ww, 26u, dg_rgb(0x1E,0x6F,0xD0));
-        dg_text(wx + 10u, wy + 9u, "Welcome to XOS", dg_rgb(0xFF,0xFF,0xFF), dg_rgb(0x1E,0x6F,0xD0));
-        dg_text(wx + 16u, wy + 44u, "Tab select icon, Enter open app", dg_theme_c(1u), mbg);
-        dg_text(wx + 16u, wy + 68u, "S Start menu   R Right menu", dg_theme_c(1u), mbg);
-        dg_text(wx + 16u, wy + 92u, "M move   N minimize   Esc close", dg_theme_c(1u), mbg);
-        dg_text(wx + 16u, wy + 116u, "Start menu: 24 apps", dg_theme_c(1u), mbg);
-        dg_text(wx + 16u, wy + 140u, "Note editor saves to /note.txt", dg_theme_c(1u), mbg);
-        dg_text(wx + ww / 2u - 88u, wy + wh - 24u, "Press Enter to start", dg_rgb(0x30,0xC0,0x50), mbg);
     }
 
     /* 5.6) 全局帮助浮层（F1）：快捷键全景 + 应用清单（用户习惯贴合） */
