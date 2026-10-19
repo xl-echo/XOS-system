@@ -732,13 +732,20 @@ static void dg_win_content(const dg_win_t *w)
             } else if (pg[0] == 's' && pg[1] == 'y' && pg[2] == 's') {
                 extern u32 pmm_total_pages(void);
                 extern u32 desk_task_count(void);
-                char nb[16];
+                char nb[16], nb2[16];
                 dg_text(bx + 4u, by + 28u, "System Status", fg, body);
                 dg_text(bx + 4u, by + 50u, "Mem: 128 MB (4K pages)", dg_rgb(0xE0,0xE0,0xE0), body);
                 dg_text(bx + 4u, by + 72u, "Procs: ", dg_rgb(0xE0,0xE0,0xE0), body);
                 dg_itoa((int)desk_task_count(), nb);
                 dg_text(bx + 72u, by + 72u, nb, dg_rgb(0x30,0xC0,0x50), body);
-                dg_text(bx + 4u, by + 94u, "Display: 640x480x32 VBE fb", dg_rgb(0xE0,0xE0,0xE0), body);
+                /* 显示实际运行时分辨率（随窗口/屏幕自适应，不写死） */
+                dg_text(bx + 4u, by + 94u, "Display: ", dg_rgb(0xE0,0xE0,0xE0), body);
+                dg_itoa((int)DG_W, nb);
+                dg_itoa((int)DG_H, nb2);
+                dg_text(bx + 74u, by + 94u, nb, dg_rgb(0x30,0xC0,0x50), body);
+                dg_text(bx + 110u, by + 94u, "x", dg_rgb(0xE0,0xE0,0xE0), body);
+                dg_text(bx + 122u, by + 94u, nb2, dg_rgb(0x30,0xC0,0x50), body);
+                dg_text(bx + 150u, by + 94u, "x32 VBE fb", dg_rgb(0xE0,0xE0,0xE0), body);
             } else if (pg[0] == 'h' && pg[1] == 'e' && pg[2] == 'l' && pg[3] == 'p') {
                 dg_text(bx + 4u, by + 28u, "Desktop Keys", fg, body);
                 dg_text(bx + 4u, by + 50u, "M move  N minimize  W switch  1-4 restore", dg_rgb(0xE0,0xE0,0xE0), body);
