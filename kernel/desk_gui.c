@@ -2946,12 +2946,33 @@ void desk_gui_run(void)
                 dg_render();
                 continue;
             }
-            /* 文件管理器：Enter/Backspace 导航 */
+            /* 文件管理器：Enter/Backspace 导航 + 桌面级快捷键（S菜单/R右键/N最小化/W切换/1-4恢复） */
             if (w->icon == 0u) {
                 if (key == KEY_ESC) {
                     dg_win_close();
                 } else if (key == KEY_M) {
                     dg_move_mode = 1u;
+                } else if (key == KEY_S) {
+                    dg_menu = DG_MENU_START;
+                    dg_menusel = 0u;
+                } else if (key == KEY_R) {
+                    dg_menu = DG_MENU_RIGHT;
+                    dg_menusel = 0u;
+                } else if (key == KEY_N) {
+                    dg_wins[dg_focus].min = dg_wins[dg_focus].min ? 0u : 1u;
+                } else if (key == KEY_W) {
+                    u32 i, next = dg_focus;
+                    for (i = 0u; i < DG_WIN_MAX; i++) {
+                        next = (next + 1u) % DG_WIN_MAX;
+                        if (dg_wins[next].open) break;
+                    }
+                    if (dg_wins[next].open) dg_focus = next;
+                } else if (key >= KEY_1 && key <= KEY_4) {
+                    u32 wi = key - KEY_1;
+                    if (dg_wins[wi].open) {
+                        dg_wins[wi].min = 0u;
+                        dg_focus = wi;
+                    }
                 } else if (key == KEY_DOWN || key == KEY_TAB) {
                     if (dg_fm_sel < 2u) dg_fm_sel++;
                 } else if (key == KEY_UP) {
@@ -2996,6 +3017,14 @@ void desk_gui_run(void)
                     dg_win_close();
                 } else if (key == KEY_M) {
                     dg_move_mode = 1u;                       /* 仍可移动窗口 */
+                } else if (key == KEY_W || key == KEY_TAB) {
+                    /* 帮助文档承诺 "W switch"：窗口切换优先于应用输入（多窗口可达） */
+                    u32 i, next = dg_focus;
+                    for (i = 0u; i < DG_WIN_MAX; i++) {
+                        next = (next + 1u) % DG_WIN_MAX;
+                        if (dg_wins[next].open) break;
+                    }
+                    if (dg_wins[next].open) dg_focus = next;
                 } else if (w->icon == 1u) {
                     dg_edit_input(w, key);
                 } else if (w->icon == 2u) {
