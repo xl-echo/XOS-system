@@ -788,13 +788,32 @@ static void dg_win_content(const dg_win_t *w)
                 dg_text(bx + 4u, by + 90u, "Procs:  ", fg, body);
                 dg_u2s(pproc, nb);
                 dg_text(bx + 64u, by + 90u, nb, blue, body);
-                dg_text(bx + 4u, by + 112u, "Display: 640x480 32-bit", fg, body);
+                /* 显示实际运行时分辨率（随屏幕自适应，不写死） */
+                {
+                    char nb2[16];
+                    dg_text(bx + 4u, by + 112u, "Display: ", fg, body);
+                    dg_itoa((int)DG_W, nb);
+                    dg_itoa((int)DG_H, nb2);
+                    dg_text(bx + 74u, by + 112u, nb, blue, body);
+                    dg_text(bx + 110u, by + 112u, "x", fg, body);
+                    dg_text(bx + 122u, by + 112u, nb2, blue, body);
+                    dg_text(bx + 150u, by + 112u, " 32-bit", gray, body);
+                }
                 dg_text(bx, by + 136u, "1-4 tabs  Esc close  M move", gray, body);
             } else if (dg_set_page == 1u) {
                 dg_text(bx, by, "Settings - Drivers [2]", fg, body);
                 dg_text(bx + 4u, by + 24u, "Keyboard: PS/2 loaded", dg_rgb(0x22,0x88,0x22), body);
                 dg_text(bx + 4u, by + 46u, "Mouse: not connected", gray, body);
-                dg_text(bx + 4u, by + 68u, "Display: Bochs VBE 640x480x32", dg_rgb(0x22,0x88,0x22), body);
+                {
+                    char nb[16], nb2[16];
+                    dg_text(bx + 4u, by + 68u, "Display: Bochs VBE ", dg_rgb(0x22,0x88,0x22), body);
+                    dg_itoa((int)DG_W, nb);
+                    dg_itoa((int)DG_H, nb2);
+                    dg_text(bx + 130u, by + 68u, nb, dg_rgb(0x22,0x88,0x22), body);
+                    dg_text(bx + 152u, by + 68u, "x", dg_rgb(0x22,0x88,0x22), body);
+                    dg_text(bx + 160u, by + 68u, nb2, dg_rgb(0x22,0x88,0x22), body);
+                    dg_text(bx + 182u, by + 68u, "x32", dg_rgb(0x22,0x88,0x22), body);
+                }
                 dg_text(bx + 4u, by + 90u, "Disk: ATA loaded (xos.img)", dg_rgb(0x22,0x88,0x22), body);
                 dg_text(bx + 4u, by + 112u, "COM1 loaded (debug log)", dg_rgb(0x22,0x88,0x22), body);
                 dg_text(bx, by + 136u, "1-4 tabs  Esc close  M move", gray, body);
