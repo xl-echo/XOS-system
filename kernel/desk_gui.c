@@ -378,6 +378,55 @@ void dg_text_ol_t(u32 x, u32 y, const char *s, u32 fg, u32 ol)
     }
 }
 
+/* 阶梯圆角矩形（45° 像素圆角） */
+static void dg_rrect(u32 x, u32 y, u32 w, u32 h, u32 r, u32 color)
+{
+    u32 i;
+    if (w < 2u * r || h < 2u * r) { dg_fill(x, y, w, h, color); return; }
+    dg_fill(x, y + r, w, h - 2u * r, color);
+    dg_fill(x + r, y, w - 2u * r, r, color);
+    dg_fill(x + r, y + h - r, w - 2u * r, r, color);
+    for (i = 0u; i < r; i++) {
+        u32 len = r - i;
+        dg_fill(x + i, y + i, len, 1u, color);              /* 左上 */
+        dg_fill(x + w - r + i, y + i, len, 1u, color);      /* 右上 */
+        dg_fill(x + i, y + h - r + i, len, 1u, color);      /* 左下 */
+        dg_fill(x + w - r + i, y + h - r + i, len, 1u, color); /* 右下 */
+    }
+}
+
+/* 应用图标主色（开始菜单左侧色块） */
+static u32 dg_icon_color(u32 idx)
+{
+    switch (idx) {
+    case 0u: return dg_rgb(0x2F,0x7D,0xE1);   /* Files */
+    case 1u: return dg_rgb(0xF0,0xF0,0xF0);   /* Note */
+    case 2u: return dg_rgb(0x88,0x8C,0x90);   /* Calc */
+    case 3u: return dg_rgb(0x10,0x10,0x18);   /* Term */
+    case 4u: return dg_rgb(0x1E,0x6F,0xD0);   /* Web */
+    case 5u: return dg_rgb(0x50,0x5A,0x66);   /* Settings */
+    case 6u: return dg_rgb(0x1A,0x1A,0x22);   /* Music */
+    case 7u: return dg_rgb(0x30,0x34,0x3C);   /* Games */
+    case 8u: return dg_rgb(0xE8,0xA0,0x40);   /* Photos */
+    case 9u: return dg_rgb(0x28,0x3A,0x50);   /* Clock */
+    case 10u: return dg_rgb(0x1E,0x3A,0x24);  /* Monit */
+    case 11u: return dg_rgb(0x1A,0x3A,0x5E);  /* Weather */
+    case 12u: return dg_rgb(0x1E,0x1E,0x28);  /* Tasks */
+    case 13u: return dg_rgb(0x3A,0x2E,0x1E);  /* Pkgs */
+    case 14u: return dg_rgb(0x2A,0x2A,0x3A);  /* Pics */
+    case 15u: return dg_rgb(0x28,0x30,0x3C);  /* Shot */
+    case 16u: return dg_rgb(0x20,0x18,0x30);  /* Video */
+    case 17u: return dg_rgb(0x3A,0x1E,0x1E);  /* PDF */
+    case 18u: return dg_rgb(0x14,0x1E,0x28);  /* Code */
+    case 19u: return dg_rgb(0x1E,0x28,0x1E);  /* Search */
+    case 20u: return dg_rgb(0x28,0x24,0x1E);  /* Help */
+    case 21u: return dg_rgb(0x1E,0x28,0x34);  /* Boot */
+    case 22u: return dg_rgb(0x28,0x1E,0x30);  /* Text */
+    case 23u: return dg_rgb(0x1E,0x2E,0x28);  /* Mail */
+    default: return dg_rgb(0x60,0x60,0x60);
+    }
+}
+
 void dg_text(u32 x, u32 y, const char *s, u32 fg, u32 bg)
 {
     if (!s) return;
@@ -1926,19 +1975,29 @@ static void dg_render(void)
     dg_fill(DG_W - 6u, DG_H - DG_TASKBAR, 4u, DG_TASKBAR,
             g_theme == 1u ? dg_rgb(0xC8,0xD0,0xDC) : dg_rgb(0x48,0x58,0x70));
 
-    /* 5) 开始菜单浮层 */
+    /* 5) 开始菜单浮层（方案A·极光玻璃：圆角深蓝玻璃面板+蓝色标题栏+发光选中行+应用色块） */
     if (dg_menu == DG_MENU_START) {
-        u32 mx = 6u, my = DG_H - DG_TASKBAR - 24u * 14u - 18u;
-        u32 mw = 210u, mh = 24u * 14u + 18u;
-        u32 mbg = dg_theme_c(8u), mfr = dg_theme_c(7u);
+        u32 mx = 6u, my = DG_H - DG_TASKBAR - 24u * 14u - 32u;
+        u32 mw = 210u, mh = 24u * 14u + 32u;
+        u32 mbg, mfr;
         if (my < 8u) my = 8u;
-        dg_fill(mx, my, mw, mh, mbg);
+        mbg = (g_theme == 1u) ? dg_rgb(0xE8,0xEC,0xF0) : dg_rgb(0x12,0x1C,0x2E);
+        mfr = (g_theme == 1u) ? dg_rgb(0x40,0x50,0x60) : dg_rgb(0x2A,0x4A,0x88);
+        dg_rrect(mx, my, mw, mh, 6u, mbg);
         dg_rect(mx, my, mw, mh, mfr);
-        dg_text(mx + 8u, my + 4u, "XOS Applications (24)", dg_rgb(0x50,0xA8,0xE8), mbg);
+        /* 蓝色标题栏 */
+        dg_fill(mx + 1u, my + 1u, mw - 2u, 14u,
+                g_theme == 1u ? dg_rgb(0x2F,0x6F,0xB0) : dg_rgb(0x1E,0x6F,0xD0));
+        dg_text(mx + 8u, my + 4u, "XOS Applications (24)", dg_rgb(0xFF,0xFF,0xFF),
+                g_theme == 1u ? dg_rgb(0x2F,0x6F,0xB0) : dg_rgb(0x1E,0x6F,0xD0));
         for (i = 0u; i < DG_ICON_N; i++) {
-            u32 iy = my + 18u + i * 14u;
-            if (i == dg_menusel) dg_fill(mx + 4u, iy, mw - 8u, 12u, dg_rgb(0x2F,0x7D,0xE1));
-            dg_text(mx + 10u, iy + 3u, dg_apps[i],
+            u32 iy = my + 16u + i * 14u;
+            if (i == dg_menusel) {
+                dg_fill(mx + 2u, iy, mw - 4u, 12u, dg_rgb(0x2F,0x7D,0xE1));
+                dg_fill(mx + 2u, iy, 3u, 12u, dg_rgb(0x6A,0xC8,0xFF));
+            }
+            dg_fill(mx + 6u, iy + 2u, 8u, 8u, dg_icon_color(i));   /* 应用色块 */
+            dg_text(mx + 18u, iy + 2u, dg_apps[i],
                     i == dg_menusel ? dg_rgb(0xFF,0xFF,0xFF) : dg_theme_c(1u),
                     i == dg_menusel ? dg_rgb(0x2F,0x7D,0xE1) : mbg);
         }
@@ -2764,12 +2823,12 @@ void desk_gui_run(void)
                             dg_render();
                         }
                     }
-                    /* 开始菜单项点击（与绘制布局一致：mx=6, 项 y=my+18+i*14） */
+                    /* 开始菜单项点击（与绘制布局一致：mx=6, 项 y=my+16+i*14） */
                     else if (dg_menu == DG_MENU_START && hx >= 10u && hx <= 216u) {
-                        u32 my0 = (DG_H > DG_TASKBAR + 336u + 18u)
-                                      ? DG_H - DG_TASKBAR - 24u * 14u - 18u : 8u;
-                        if (hy >= my0 + 18u) {
-                            u32 it = (hy - (my0 + 18u)) / 14u;
+                        u32 my0 = (DG_H > DG_TASKBAR + 336u + 32u)
+                                      ? DG_H - DG_TASKBAR - 24u * 14u - 32u : 8u;
+                        if (hy >= my0 + 16u) {
+                            u32 it = (hy - (my0 + 16u)) / 14u;
                             if (it < DG_ICON_N) {
                                 dg_win_open(it);
                                 dg_menu = DG_MENU_NONE;
