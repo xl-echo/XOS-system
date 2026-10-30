@@ -1635,10 +1635,17 @@ static void dg_window_draw(const dg_win_t *w)
     u32 title = dg_theme_c(2u);
     u32 body  = dg_theme_c(3u);
     u32 frm   = dg_theme_c(4u);
+    u32 mono  = (g_theme == 0u && g_hc == 0u) ? 1u : 0u;   /* 方案C·极简高对比：深色主题窗口黑白呈现 */
     const char *name = dg_icons[w->icon].name;
+    if (mono) {
+        title = dg_rgb(0x00,0x00,0x00);      /* 黑色粗标题栏 */
+        body  = dg_rgb(0xF8,0xF8,0xF8);      /* 白底窗口体 */
+        frm   = dg_rgb(0x28,0x28,0x28);      /* 深灰边框 */
+    }
     /* 焦点区分：焦点窗口标题栏高亮，非焦点暗化（交互一致性，用户可一眼分辨活动窗口） */
     if (w != &dg_wins[dg_focus])
-        title = (g_theme == 0u) ? dg_rgb(0x22,0x32,0x4A) : dg_rgb(0xB8,0xC0,0xC8);
+        title = (g_theme == 0u) ? (mono ? dg_rgb(0x2A,0x2A,0x2A) : dg_rgb(0x22,0x32,0x4A))
+                                : dg_rgb(0xB8,0xC0,0xC8);
     /* 投影阴影（右/下 4px，制造层次感；先画阴影再画窗体） */
     if (g_theme == 1u) {
         dg_fill(w->x + 4u, w->y + 4u, w->w, w->h, dg_rgb(0x50,0x58,0x60));
@@ -1647,41 +1654,47 @@ static void dg_window_draw(const dg_win_t *w)
     }
     dg_fill(w->x, w->y, w->w, w->h, body);
     dg_fill(w->x, w->y, w->w, 26u, title);
-    /* 左侧应用色条（直观识别应用类别） */
-    dg_fill(w->x + 5u, w->y + 6u, 5u, 14u, dg_win_accent(w->icon));
+    /* 左侧应用色条（直观识别应用类别；黑白模式下用浅灰） */
+    dg_fill(w->x + 5u, w->y + 6u, 5u, 14u,
+            mono ? dg_rgb(0x88,0x88,0x88) : dg_win_accent(w->icon));
     dg_text(w->x + 16u, w->y + 9u, name, dg_theme_c(1u), title);
     /* 右侧尺寸档位（移到按钮组左侧，避免与窗口按钮重叠） */
     dg_text(w->x + w->w - 96u, w->y + 9u,
             dg_wsz == 0u ? "1x" : (dg_wsz == 1u ? "2x" : "3x"),
-            dg_rgb(0xE8,0xC8,0x4A), title);
+            mono ? dg_rgb(0xC0,0xC0,0xC0) : dg_rgb(0xE8,0xC8,0x4A), title);
     /* 3D 边框：上/左亮线 + 右/下暗线 + 外描边（立体可识别） */
-    dg_fill(w->x, w->y, w->w, 1u, g_theme == 1u ? dg_rgb(0xFF,0xFF,0xFF) : dg_rgb(0x38,0x4C,0x68));
-    dg_fill(w->x, w->y, 1u, w->h, g_theme == 1u ? dg_rgb(0xFF,0xFF,0xFF) : dg_rgb(0x2A,0x3C,0x54));
-    dg_fill(w->x + w->w - 1u, w->y, 1u, w->h, dg_rgb(0x30,0x40,0x50));
-    dg_fill(w->x, w->y + w->h - 1u, w->w, 1u, dg_rgb(0x30,0x40,0x50));
+    dg_fill(w->x, w->y, w->w, 1u, mono ? dg_rgb(0xF0,0xF0,0xF0)
+        : (g_theme == 1u ? dg_rgb(0xFF,0xFF,0xFF) : dg_rgb(0x38,0x4C,0x68)));
+    dg_fill(w->x, w->y, 1u, w->h, mono ? dg_rgb(0xF0,0xF0,0xF0)
+        : (g_theme == 1u ? dg_rgb(0xFF,0xFF,0xFF) : dg_rgb(0x2A,0x3C,0x54)));
+    dg_fill(w->x + w->w - 1u, w->y, 1u, w->h, mono ? dg_rgb(0x38,0x38,0x38) : dg_rgb(0x30,0x40,0x50));
+    dg_fill(w->x, w->y + w->h - 1u, w->w, 1u, mono ? dg_rgb(0x38,0x38,0x38) : dg_rgb(0x30,0x40,0x50));
     dg_rect(w->x, w->y, w->w, w->h, frm);
-    /* 关闭按钮 X */
-    dg_fill(w->x + w->w - 24u, w->y + 5u, 18u, 16u, dg_rgb(0xC0,0x30,0x30));
-    dg_char(w->x + w->w - 20u, w->y + 9u, 'X', dg_rgb(0xFF,0xFF,0xFF), dg_rgb(0xC0,0x30,0x30), g_font_scale);
+    /* 关闭按钮 X（黑白模式：白底黑叉） */
+    dg_fill(w->x + w->w - 24u, w->y + 5u, 18u, 16u, mono ? dg_rgb(0xF0,0xF0,0xF0) : dg_rgb(0xC0,0x30,0x30));
+    dg_char(w->x + w->w - 20u, w->y + 9u, 'X',
+            mono ? dg_rgb(0x10,0x10,0x10) : dg_rgb(0xFF,0xFF,0xFF),
+            mono ? dg_rgb(0xF0,0xF0,0xF0) : dg_rgb(0xC0,0x30,0x30), g_font_scale);
     /* 最大化按钮 □（未最大化=方框，已最大化=还原双框） */
-    dg_fill(w->x + w->w - 48u, w->y + 5u, 18u, 16u, dg_rgb(0x3A,0x6A,0x4A));
+    dg_fill(w->x + w->w - 48u, w->y + 5u, 18u, 16u, mono ? dg_rgb(0xF0,0xF0,0xF0) : dg_rgb(0x3A,0x6A,0x4A));
     if (!w->maxed) {
-        dg_rect(w->x + w->w - 43u, w->y + 9u, 9u, 8u, dg_rgb(0xF0,0xF0,0xF0));
+        dg_rect(w->x + w->w - 43u, w->y + 9u, 9u, 8u, mono ? dg_rgb(0x10,0x10,0x10) : dg_rgb(0xF0,0xF0,0xF0));
     } else {
-        dg_fill(w->x + w->w - 44u, w->y + 8u, 9u, 7u, dg_rgb(0xF0,0xF0,0xF0));
-        dg_fill(w->x + w->w - 42u, w->y + 11u, 7u, 5u, dg_rgb(0x3A,0x6A,0x4A));
+        dg_fill(w->x + w->w - 44u, w->y + 8u, 9u, 7u, mono ? dg_rgb(0x10,0x10,0x10) : dg_rgb(0xF0,0xF0,0xF0));
+        dg_fill(w->x + w->w - 42u, w->y + 11u, 7u, 5u, mono ? dg_rgb(0xF0,0xF0,0xF0) : dg_rgb(0x3A,0x6A,0x4A));
     }
     /* 最小化按钮 _ */
-    dg_fill(w->x + w->w - 72u, w->y + 5u, 18u, 16u, dg_rgb(0x3A,0x5A,0x8A));
-    dg_fill(w->x + w->w - 67u, w->y + 16u, 8u, 2u, dg_rgb(0xF0,0xF0,0xF0));
-    /* 窗口按钮 hover 反馈：悬停即白框高亮（普通用户可识别可点） */
+    dg_fill(w->x + w->w - 72u, w->y + 5u, 18u, 16u, mono ? dg_rgb(0xF0,0xF0,0xF0) : dg_rgb(0x3A,0x5A,0x8A));
+    dg_fill(w->x + w->w - 67u, w->y + 16u, 8u, 2u, mono ? dg_rgb(0x10,0x10,0x10) : dg_rgb(0xF0,0xF0,0xF0));
+    /* 窗口按钮 hover 反馈：悬停即白框高亮（普通用户可识别可点；黑白模式用黑框） */
     if (g_my >= (u32)(w->y + 5u) && g_my <= (u32)(w->y + 21u)) {
+        u32 hov = mono ? dg_rgb(0x00,0x00,0x00) : dg_rgb(0xFF,0xFF,0xFF);
         if (g_mx >= (u32)w->x + (i32)w->w - 24u && g_mx <= (u32)w->x + (i32)w->w - 6u)
-            dg_rect(w->x + w->w - 24u, w->y + 5u, 18u, 16u, dg_rgb(0xFF,0xFF,0xFF));
+            dg_rect(w->x + w->w - 24u, w->y + 5u, 18u, 16u, hov);
         if (g_mx >= (u32)w->x + (i32)w->w - 48u && g_mx <= (u32)w->x + (i32)w->w - 30u)
-            dg_rect(w->x + w->w - 48u, w->y + 5u, 18u, 16u, dg_rgb(0xFF,0xFF,0xFF));
+            dg_rect(w->x + w->w - 48u, w->y + 5u, 18u, 16u, hov);
         if (g_mx >= (u32)w->x + (i32)w->w - 72u && g_mx <= (u32)w->x + (i32)w->w - 54u)
-            dg_rect(w->x + w->w - 72u, w->y + 5u, 18u, 16u, dg_rgb(0xFF,0xFF,0xFF));
+            dg_rect(w->x + w->w - 72u, w->y + 5u, 18u, 16u, hov);
     }
     /* 移动模式边框提示 */
     if (dg_move_mode && w == &dg_wins[dg_focus])
