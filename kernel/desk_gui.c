@@ -24,6 +24,7 @@
 #include "sound.h"
 #include "rtc.h"
 #include "sysconf.h"
+#include "kmalloc.h"
 #include "xos_wallpaper.h"
 
 extern void *memset(void *dst, int c, unsigned int n);
@@ -77,7 +78,7 @@ static u32 dg_theme_c(u32 idx)
         return dg_rgb(0x18,0x18,0x18);
     }
     switch (idx) {
-    case 0u: return dg_rgb(0x18,0x1C,0x28);   /* 任务栏 */
+    case 0u: return dg_rgb(0x12,0x1C,0x2E);   /* 任务栏（玻璃深蓝底） */
     case 1u: return dg_rgb(0xE8,0xE8,0xE8);   /* 主文本 */
     case 2u: return dg_rgb(0x1E,0x3A,0x5F);   /* 窗口标题栏 */
     case 3u: return dg_rgb(0xEE,0xEE,0xEE);   /* 窗口体 */
@@ -316,6 +317,62 @@ void dg_text_ol(u32 x, u32 y, const char *s, u32 fg, u32 ol, u32 bg)
     if (!s) return;
     while (*s) {
         dg_char_ol(x, y, (u8)*s, fg, ol, bg, g_font_scale);
+        x += 8u * g_font_scale;
+        s++;
+    }
+}
+
+/* 透明底描边文本：描边层同 dg_char_ol，本体 off 像素不覆盖（用于渐变/极光背景上文字） */
+static void dg_char_ol_t(u32 x, u32 y, u8 ch, u32 fg, u32 ol, u32 scale)
+{
+    u32 i, j;
+    const u8 *g;
+    u32 idx;
+    if (ch < 0x20u) return;
+    idx = ch - 0x20u;
+    if (idx >= 96u) idx = 95u;
+    g = dg_font8[idx];
+    {
+        i32 dx, dy;
+        for (dy = -1; dy <= 1; dy++)
+            for (dx = -1; dx <= 1; dx++) {
+                if (dx == 0 && dy == 0) continue;
+                for (j = 0u; j < 8u; j++)
+                    for (i = 0u; i < 8u; i++) {
+                        u32 on = (g[j] >> (7u - i)) & 1u;
+                        if (!on) continue;
+                        if (scale <= 1u) {
+                            dgpix((u32)((i32)x + (i32)i + dx),
+                                  (u32)((i32)y + (i32)j + dy), ol);
+                        } else {
+                            u32 px, py;
+                            for (px = 0u; px < scale; px++)
+                                for (py = 0u; py < scale; py++)
+                                    dgpix((u32)((i32)x + (i32)(i*scale) + (i32)px + dx*(i32)scale),
+                                          (u32)((i32)y + (i32)(j*scale) + (i32)py + dy*(i32)scale), ol);
+                        }
+                    }
+            }
+    }
+    for (j = 0u; j < 8u; j++)
+        for (i = 0u; i < 8u; i++) {
+            u32 on = (g[j] >> (7u - i)) & 1u;
+            if (!on) continue;
+            if (scale <= 1u) dgpix(x + i, y + j, fg);
+            else {
+                u32 px, py;
+                for (px = 0u; px < scale; px++)
+                    for (py = 0u; py < scale; py++)
+                        dgpix(x + i * scale + px, y + j * scale + py, fg);
+            }
+        }
+}
+
+void dg_text_ol_t(u32 x, u32 y, const char *s, u32 fg, u32 ol)
+{
+    if (!s) return;
+    while (*s) {
+        dg_char_ol_t(x, y, (u8)*s, fg, ol, g_font_scale);
         x += 8u * g_font_scale;
         s++;
     }
@@ -1583,6 +1640,67 @@ static void dg_window_draw(const dg_win_t *w)
     dg_win_content(w);
 }
 
+/* ---------------- 桌面背景（方案A·极光科技：深蓝渐变+极光光晕；缓存防逐帧开销） ---------------- */
+static u32 *s_dbg = NULL;
+static u32 s_dbg_w = 0u, s_dbg_h = 0u;
+
+static void dg_desktop_bg(void)
+{
+    u32 x, y;
+    u32 nw = DG_W, nh = DG_H;
+    if (s_dbg && (s_dbg_w != nw || s_dbg_h != nh)) { kfree(s_dbg); s_dbg = NULL; }
+    if (s_dbg_w == nw && s_dbg_h == nh && s_dbg) return;   /* 已就绪 */
+    if (!s_dbg) s_dbg = (u32 *)kmalloc((u32)((size_t)nw * (size_t)nh * 4u), 16u, 0u);
+    if (!s_dbg) return;                                     /* 分配失败：渲染层回退原壁纸 */
+    if (g_hc) {
+        for (y = 0u; y < nh; y++)
+            for (x = 0u; x < nw; x++) s_dbg[y * nw + x] = dg_rgb(0x00,0x00,0x00);
+    } else {
+        int rx = (int)(nw / 2u);
+        int ry = (int)((nh * 22u) / 100u);
+        int cxd = (int)(nw / 2u);
+        int cyd = (int)((nh * 26u) / 100u);
+        int px2 = (int)(nw * 72u / 100u), py2 = (int)(nh * 16u / 100u);
+        int rx2 = (int)(nw * 16u / 100u), ry2 = (int)(nh * 12u / 100u);
+        long long R2 = (long long)rx * rx * ry * ry;
+        long long R22 = (long long)rx2 * rx2 * ry2 * ry2;
+        for (y = 0u; y < nh; y++) {
+            u32 kk = (y * 255u) / (nh ? nh : 1u);
+            u32 br = (0x10u * (255u - kk) + 0x01u * kk) / 255u;
+            u32 bg = (0x20u * (255u - kk) + 0x02u * kk) / 255u;
+            u32 bb = (0x42u * (255u - kk) + 0x06u * kk) / 255u;
+            u32 base = dg_rgb(br, bg, bb);
+            for (x = 0u; x < nw; x++) s_dbg[y * nw + x] = base;
+        }
+        for (y = 0u; y < nh; y++) {
+            for (x = 0u; x < nw; x++) {
+                u32 c = s_dbg[y * nw + x];
+                u32 cr = (c >> 16u) & 0xFFu, cg = (c >> 8u) & 0xFFu, cb = c & 0xFFu;
+                int dx = (int)x - cxd, dy = (int)y - cyd;
+                long long v = (long long)rx * rx * dy * dy + (long long)ry * ry * dx * dx;
+                if (v < R2) {
+                    int k = (int)((R2 - v) / (R2 / 256LL + 1LL));
+                    if (k > 255) k = 255;
+                    cr = (cr * (255u - (u32)k) + 0x22u * (u32)k) / 255u;
+                    cg = (cg * (255u - (u32)k) + 0x62u * (u32)k) / 255u;
+                    cb = (cb * (255u - (u32)k) + 0xA8u * (u32)k) / 255u;
+                }
+                dx = (int)x - px2; dy = (int)y - py2;
+                v = (long long)rx2 * rx2 * dy * dy + (long long)ry2 * ry2 * dx * dx;
+                if (v < R22) {
+                    int k = (int)((R22 - v) / (R22 / 256LL + 1LL));
+                    if (k > 255) k = 255;
+                    cr = (cr * (255u - (u32)k) + 0x3Au * (u32)k) / 255u;
+                    cg = (cg * (255u - (u32)k) + 0x20u * (u32)k) / 255u;
+                    cb = (cb * (255u - (u32)k) + 0x6Au * (u32)k) / 255u;
+                }
+                s_dbg[y * nw + x] = (cr << 16u) | (cg << 8u) | cb;
+            }
+        }
+    }
+    s_dbg_w = nw; s_dbg_h = nh;
+}
+
 /* ---------------- 桌面渲染 ---------------- */
 static void dg_render(void)
 {
@@ -1592,13 +1710,19 @@ static void dg_render(void)
     u32 sec, hh, mm;
     char tbuf[16];
 
-    /* 1) 设计稿壁纸：XOS 1.0 桌面主界面（320x240 拉伸）；高对比模式改纯黑底 */
-    for (y = 0u; y < DG_H - DG_TASKBAR; y++) {
-        u32 wy = (y * 120u) / (DG_H - DG_TASKBAR);
-        for (x = 0u; x < DG_W; x++) {
-            u32 wx = (x * 160u) / DG_W;
-            dg_fb[y * DG_W + x] = g_hc ? dg_rgb(0x00,0x00,0x00)
-                                       : xos_wallpaper[wy * 160u + wx];
+    /* 1) 桌面背景（方案A·极光科技：深蓝渐变+极光光晕缓存；高对比模式纯黑） */
+    dg_desktop_bg();
+    if (s_dbg) {
+        u32 rows = DG_H - DG_TASKBAR;
+        memcpy((void *)dg_fb, (const void *)s_dbg, (size_t)rows * (size_t)DG_W * 4u);
+    } else {
+        for (y = 0u; y < DG_H - DG_TASKBAR; y++) {
+            u32 wy = (y * 120u) / (DG_H - DG_TASKBAR);
+            for (x = 0u; x < DG_W; x++) {
+                u32 wx = (x * 160u) / DG_W;
+                dg_fb[y * DG_W + x] = g_hc ? dg_rgb(0x00,0x00,0x00)
+                                           : xos_wallpaper[wy * 160u + wx];
+            }
         }
     }
 
@@ -1636,6 +1760,12 @@ static void dg_render(void)
             u32 row = i / cols;
             x = 24u + col * cw;
             y = 40u + row * rh;
+            /* 方案A：图标发光底座（半透明深蓝底+亮蓝光晕框+底部光条） */
+            if (!g_hc) {
+                dg_fill(x - 2u, y - 2u, 44u, 44u, dg_rgb(0x0C,0x1E,0x3C));
+                dg_rect(x - 1u, y - 1u, 42u, 42u, dg_rgb(0x2A,0x4A,0x88));
+                dg_fill(x + 1u, y + 32u, 38u, 2u, dg_rgb(0x1E,0x6F,0xD0));
+            }
             dg_icon_pattern(x, y, dg_icons[i].icon);
             if (g_hc) dg_rect(x, y, 40u, 40u, dg_rgb(0xFF,0xFF,0xFF));  /* 高对比：图标白描边 */
             if (i == dg_sel && dg_nwin == 0u) {
@@ -1653,9 +1783,8 @@ static void dg_render(void)
             if (g_hc) dg_text_ol(x + 2u, y + 36u, dg_icons[i].name,
                                  dg_rgb(0xFF,0xFF,0xFF), dg_rgb(0x00,0x00,0x00),
                                  dg_rgb(0x00,0x00,0x00));
-            else dg_text_ol(x + 2u, y + 36u, dg_icons[i].name,
-                            dg_rgb(0xFF,0xFF,0xFF), dg_rgb(0x00,0x00,0x00),
-                            dg_rgb(0x0E,0x22,0x40));
+            else dg_text_ol_t(x + 2u, y + 36u, dg_icons[i].name,
+                              dg_rgb(0xFF,0xFF,0xFF), dg_rgb(0x06,0x18,0x38));
         }
     }
 
@@ -1695,9 +1824,14 @@ static void dg_render(void)
             dg_text(hx + 4u, 28u, hint, dg_theme_c(1u), g_theme == 1u ? dg_rgb(0xE0,0xE6,0xEC) : dg_rgb(0x0E,0x22,0x40));
         }
     }
-    /* 4) 任务栏 */
+    /* 4) 任务栏（方案A：玻璃深蓝底+顶部双层亮光条） */
     dg_fill(0u, DG_H - DG_TASKBAR, DG_W, DG_TASKBAR, bar);
-    dg_fill(0u, DG_H - DG_TASKBAR, DG_W, 2u, g_theme == 1u ? dg_rgb(0xA8,0xB0,0xBC) : dg_rgb(0x2E,0x3A,0x4E));
+    if (g_theme == 1u) {
+        dg_fill(0u, DG_H - DG_TASKBAR, DG_W, 2u, dg_rgb(0xA8,0xB0,0xBC));
+    } else {
+        dg_fill(0u, DG_H - DG_TASKBAR, DG_W, 2u, dg_rgb(0x3A,0x5A,0x8A));
+        dg_fill(0u, DG_H - DG_TASKBAR + 2u, DG_W, 1u, dg_rgb(0x6A,0xA8,0xF0));
+    }
     /* 开始按钮 */
     dg_fill(6u, DG_H - DG_TASKBAR + (g_tb_h - 20u) / 2u, 56u, 20u, dg_theme_c(5u));
     dg_text(14u, DG_H - DG_TASKBAR + dg_tb_txt_y(), "XOS", dg_rgb(0xFF,0xFF,0xFF), dg_theme_c(5u));
